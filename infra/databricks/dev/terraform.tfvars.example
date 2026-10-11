@@ -1,0 +1,8 @@
+databricks_account_id   = "00000000-0000-0000-0000-000000000000"
+databricks_workspace_id = 1234567890123456
+databricks_host         = "https://adb-0000000000000000.0.azuredatabricks.net"
+workspace_catalog_name  = "nombre_workspace_catalog"
+github_owner            = "tu-usuario"
+github_repository       = "proyecto-databricks-cicd"
+developer_group_name    = "data-engineers"
+developer_user_name     = "desarrollador@example.com"

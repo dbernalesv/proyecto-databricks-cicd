@@ -1,0 +1,25 @@
+resources:
+  jobs:
+    smoke_test:
+      name: proyecto-test-smoke
+      description: Verificación mínima posterior al despliegue del SHA promovido.
+      max_concurrent_runs: 1
+      timeout_seconds: 900
+      tags:
+        managed_by: databricks_bundle
+        git_sha: ${var.git_sha}
+      tasks:
+        - task_key: smoke_test
+          notebook_task:
+            notebook_path: /Workspace/data/proyecto_test/smoke/smoke_test
+            source: WORKSPACE
+            base_parameters:
+              environment: ${bundle.target}
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              expected_git_sha: ${var.git_sha}
+          environment_key: serverless
+      environments:
+        - environment_key: serverless
+          spec:
+            environment_version: "4"

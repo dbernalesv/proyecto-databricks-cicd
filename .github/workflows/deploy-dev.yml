@@ -1,0 +1,27 @@
+name: Deploy exact main commit to Dev
+
+on:
+  # Bootstrap seguro: el trigger por push se habilitará mediante el primer PR,
+  # después de configurar el Environment dev y la protección de main.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: databricks-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/reusable-databricks-deploy.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: dev
+      bundle_target: dev
+      project_root: proyecto_test
+      workspace_root: /Workspace/data/proyecto_test
+      smoke_job_key: smoke_test

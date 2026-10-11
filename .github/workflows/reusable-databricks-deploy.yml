@@ -1,0 +1,123 @@
+name: Reusable Databricks Bundle deployment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment que contiene las variables del workspace.
+        required: true
+        type: string
+      bundle_target:
+        description: Target declarado en databricks.yml.
+        required: true
+        type: string
+      project_root:
+        description: Árbol local que debe reflejarse en el workspace.
+        required: true
+        type: string
+      workspace_root:
+        description: Ruta dedicada y autorizada para reconciliación.
+        required: true
+        type: string
+      smoke_job_key:
+        description: Clave del Job de humo declarado por el Bundle.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Bundle, strict mirror and smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: ${{ inputs.environment }}
+    env:
+      APP_ENV: ${{ inputs.environment }}
+      DATABRICKS_AUTH_TYPE: github-oidc
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CATALOG: ${{ vars.DATABRICKS_CATALOG }}
+      DATABRICKS_SCHEMA: ${{ vars.DATABRICKS_SCHEMA }}
+      DATABRICKS_WORKSPACE_ROOT: ${{ inputs.workspace_root }}
+    steps:
+      - name: Checkout exact triggering commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.11"
+
+      - name: Install project without development dependencies
+        run: python -m pip install --disable-pip-version-check --no-deps --editable .
+
+      - name: Validate configuration and safe destination
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/validate_required_env.py
+          python scripts/reconcile_workspace.py manifest \
+            --project-root "${{ inputs.project_root }}" \
+            --workspace-root "$DATABRICKS_WORKSPACE_ROOT" \
+            --git-sha "$GITHUB_SHA" \
+            --output deployment-manifest.json
+
+      - name: Set up pinned Databricks CLI
+        uses: databricks/setup-cli@8821c27b1fe57472264eeb6e50c1f31d69552f28  # v1.10.0
+        with:
+          version: 0.296.1
+
+      - name: Verify OIDC identity
+        run: databricks current-user me --output json >/dev/null
+
+      - name: Validate and deploy Bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          databricks bundle validate --target "${{ inputs.bundle_target }}" \
+            --var "git_sha=$GITHUB_SHA" \
+            --var "catalog=$DATABRICKS_CATALOG" \
+            --var "schema=$DATABRICKS_SCHEMA"
+          databricks bundle deploy --target "${{ inputs.bundle_target }}" --auto-approve \
+            --var "git_sha=$GITHUB_SHA" \
+            --var "catalog=$DATABRICKS_CATALOG" \
+            --var "schema=$DATABRICKS_SCHEMA"
+
+      - name: Restore exact Git state in workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Los cambios manuales de $DATABRICKS_WORKSPACE_ROOT son temporales y serán reconciliados."
+          python scripts/reconcile_workspace.py reconcile \
+            --project-root "${{ inputs.project_root }}" \
+            --workspace-root "$DATABRICKS_WORKSPACE_ROOT" \
+            --git-sha "$GITHUB_SHA" \
+            --output deployment-manifest.json \
+            --apply
+
+      - name: Run Bundle smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          databricks bundle run --target "${{ inputs.bundle_target }}" \
+            --var "git_sha=$GITHUB_SHA" \
+            --var "catalog=$DATABRICKS_CATALOG" \
+            --var "schema=$DATABRICKS_SCHEMA" \
+            "${{ inputs.smoke_job_key }}"
+
+      - name: Write deployment summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Databricks ${{ inputs.environment }} deployment"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Bundle target: \`${{ inputs.bundle_target }}\`"
+            echo "- Workspace root: \`$DATABRICKS_WORKSPACE_ROOT\`"
+            echo "- Policy: Git wins; manual changes are temporary"
+          } >> "$GITHUB_STEP_SUMMARY"

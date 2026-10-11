@@ -1,0 +1,8 @@
+subscription_id      = "00000000-0000-0000-0000-000000000000"
+location             = "eastus"
+owner                = "tu-alias"
+budget_amount        = 50
+budget_contact_email = "tu-correo@example.com"
+budget_start_date    = "2026-10-01T00:00:00Z"
+manage_budget        = false
+

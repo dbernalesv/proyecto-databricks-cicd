@@ -1,0 +1,4 @@
+process:
+  name: notebook_proceso_1
+  enabled: true
+  description: Configuración didáctica sin secretos ni identificadores de ambiente.

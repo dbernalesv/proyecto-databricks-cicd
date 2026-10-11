@@ -1,0 +1,600 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage{lmodern}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{fancyhdr}
+\usepackage{microtype}
+
+\geometry{top=2.1cm,bottom=2.1cm,left=2.2cm,right=2.2cm}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!55!black,
+  urlcolor=blue!60!black,
+  pdftitle={Guía detallada de la implementación CI/CD para Azure Databricks},
+  pdfauthor={Proyecto Databricks CI/CD}
+}
+
+\definecolor{dbblue}{HTML}{1B4F72}
+\definecolor{dbcyan}{HTML}{117A8B}
+\definecolor{lightblue}{HTML}{EAF2F8}
+\definecolor{codebg}{HTML}{F6F8FA}
+\definecolor{codegray}{HTML}{586069}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Proyecto Azure Databricks CI/CD}
+\rhead{Guía de aprendizaje}
+\cfoot{\thepage}
+\setlength{\headheight}{14pt}
+
+\setlist[itemize]{leftmargin=1.4em,itemsep=0.25em,topsep=0.4em}
+\setlist[enumerate]{leftmargin=1.6em,itemsep=0.35em,topsep=0.4em}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+
+\lstdefinestyle{projectcode}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  columns=fullflexible,
+  commentstyle=\color{codegray},
+  frame=single,
+  framerule=0.3pt,
+  rulecolor=\color{black!20},
+  showstringspaces=false,
+  tabsize=2
+}
+\lstset{style=projectcode}
+
+\newcommand{\concepto}[1]{\textcolor{dbblue}{\textbf{#1}}}
+\newcommand{\estado}[1]{\colorbox{lightblue}{\strut\textbf{#1}}}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{2.2cm}
+  {\color{dbblue}\rule{\textwidth}{1.2pt}}\\[1cm]
+  {\Huge\bfseries Guía detallada de la implementación\\[0.3cm]
+  CI/CD para Azure Databricks\par}
+  \vspace{0.7cm}
+  {\Large GitHub Actions, Terraform, seguridad y Declarative Automation Bundles\par}
+  \vspace{1cm}
+  {\color{dbblue}\rule{\textwidth}{1.2pt}}\\[1.5cm]
+  {\large Documento didáctico del estado actual del repositorio\par}
+  \vfill
+  \begin{tabular}{rl}
+    Proyecto: & \texttt{proyecto-databricks-cicd} \\
+    Alcance actual: & Entorno Dev preparado, sin recursos cloud creados \\
+    Fecha: & 8 de octubre de 2026 \\
+    Presupuesto objetivo: & S/200 mensuales \\
+  \end{tabular}
+  \vfill
+  {\small Este documento explica qué se creó, por qué existe cada pieza, cómo se validó y qué falta ejecutar.}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Propósito y estado actual}
+
+El proyecto es un laboratorio profesional y progresivo para aprender a llevar código Python, SQL y
+notebooks desde GitHub hasta Azure Databricks. La primera meta no es desplegar de inmediato en tres
+entornos, sino demostrar de punta a punta el flujo hacia \textbf{Dev}, controlar los costos y recién
+después incorporar QA y Prod.
+
+\subsection{Qué está implementado en el repositorio}
+
+\begin{itemize}
+  \item Estructura de código Python, SQL, notebooks y pruebas.
+  \item Configuración reproducible de herramientas de calidad y seguridad.
+  \item Terraform para crear el workspace Azure Databricks Dev y su presupuesto.
+  \item Terraform para configurar identidad OIDC, catálogo, esquema y permisos del workspace.
+  \item Un Bundle que publica una carpeta normal y administra el Job de smoke test.
+  \item Un workflow de validación de Pull Requests.
+  \item Un workflow de despliegue automático hacia Dev después del merge a \texttt{main}.
+  \item Documentación operativa, reglas de contribución y registros de decisiones arquitectónicas.
+\end{itemize}
+
+\subsection{Qué todavía no se ha ejecutado}
+
+\begin{itemize}
+  \item No existe todavía una suscripción Azure asociada al proyecto.
+  \item No se ejecutó \texttt{terraform plan} con valores reales ni \texttt{terraform apply}.
+  \item No se creó ningún workspace Databricks y no existe consumo cloud generado por el proyecto.
+  \item No se creó todavía el repositorio remoto de GitHub ni el GitHub Environment \texttt{dev}.
+  \item QA y Prod están diseñados conceptualmente, pero no se aprovisionan en esta fase.
+\end{itemize}
+
+Esta distinción es importante: \concepto{código de infraestructura} no equivale a
+\concepto{infraestructura creada}. Terraform sólo realiza cambios reales cuando se revisa y ejecuta
+un \texttt{apply} autorizado.
+
+\subsection{Qué se hace manualmente y qué automatiza Terraform}
+
+La persona propietaria crea la cuenta Microsoft/Azure, activa MFA, registra facturación, convierte la
+suscripción gratuita a Pay-As-You-Go, acepta términos, selecciona la suscripción mediante Azure CLI y
+autoriza cada \texttt{apply}. Son decisiones de identidad y facturación que no deben delegarse a un
+pipeline.
+
+Después de ese bootstrap, Terraform crea el Resource Group, presupuesto, workspace Dev, identidad y
+permisos. No se deben crear manualmente esos recursos en el portal. Terraform tampoco despliega cada
+notebook: los Bundles administran el código y Jobs con una cadencia mucho mayor que la infraestructura.
+
+\section{Arquitectura y flujo general}
+
+El flujo elegido combina integración continua sobre \texttt{main} con promoción de commits
+inmutables. \texttt{main} representa código integrado; no representa automáticamente la versión de
+Producción.
+
+\begin{lstlisting}
+feature/* o fix/*
+        |
+        | Pull Request: calidad, pruebas y seguridad
+        v
+      main  ---- despliegue automatico ----> Dev
+        |
+        | tag vX.Y.Z-rc.N
+        v
+       QA   ---- pruebas + aprobacion ----> mismo SHA
+        |
+        | tag final vX.Y.Z
+        v
+      Prod
+\end{lstlisting}
+
+Si un release candidate falla en QA, Prod continúa usando la versión estable anterior. La corrección
+se hace en una nueva rama \texttt{fix/*}, se integra mediante otro PR y genera un nuevo SHA y un nuevo
+candidato. No se mueve ni se reutiliza el tag fallido.
+
+\subsection{Por qué se promueve el mismo SHA}
+
+Un \concepto{SHA} identifica de forma única un commit Git. Promover el mismo SHA reduce la pregunta
+``¿QA probó exactamente lo que llegó a Prod?'' a una comparación verificable. No se recompila ni se
+edita el código durante la promoción.
+
+\section{Mapa del repositorio}
+
+\begin{longtable}{p{0.34\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Ruta} & \textbf{Responsabilidad} \\
+\midrule
+\endhead
+\texttt{src/databricks\_cicd/} & Código Python reutilizable y contrato de configuración por entorno. \\
+\texttt{tests/} & Pruebas unitarias ejecutadas con Pytest. \\
+\texttt{sql/} & SQL versionado y validado con dialecto Databricks. \\
+\texttt{proyecto\_test/} & Árbol de notebooks y configuración reflejado en el workspace. \\
+\texttt{resources/} & Jobs y otros recursos declarados por el Bundle. \\
+\texttt{databricks.yml} & Targets, rutas y variables del Bundle. \\
+\texttt{scripts/} & Utilidades del pipeline, como validación de variables requeridas. \\
+\texttt{infra/azure/dev/} & Recursos Azure: presupuesto, resource group y workspace Dev. \\
+\texttt{infra/databricks/dev/} & Configuración interna de Databricks después de crear el workspace. \\
+\texttt{infra/modules/} & Módulos Terraform reutilizables. \\
+\texttt{.github/workflows/} & CI de Pull Requests y despliegue Dev. \\
+\texttt{docs/adr/} & Decisiones de arquitectura y sus motivos. \\
+\texttt{pyproject.toml} & Metadatos Python, dependencias de desarrollo y configuración de herramientas. \\
+\texttt{.gitignore} & Evita versionar state, variables locales, entornos virtuales y credenciales. \\
+\bottomrule
+\end{longtable}
+
+\section{Python, entorno virtual y dependencias}
+
+\subsection{Qué es un entorno virtual}
+
+Un \concepto{entorno virtual} o \texttt{venv} es una carpeta aislada que contiene un intérprete de
+Python y sus paquetes. Evita mezclar dependencias del proyecto con paquetes globales del equipo.
+
+Durante la implementación se creó localmente \texttt{.venv/} y se instalaron las dependencias de
+desarrollo declaradas en \texttt{pyproject.toml}. La carpeta está ignorada por Git porque:
+
+\begin{itemize}
+  \item puede reconstruirse a partir de la configuración;
+  \item cambia entre Windows, Linux y macOS;
+  \item versionarla añadiría miles de archivos ajenos al código del proyecto.
+\end{itemize}
+
+El proceso conceptual fue:
+
+\begin{lstlisting}[language=bash]
+python -m venv .venv
+.venv/Scripts/python -m pip install --editable ".[dev]"
+\end{lstlisting}
+
+\texttt{--editable} instala el proyecto apuntando a la carpeta de trabajo. Así, los cambios en
+\texttt{src/} se reflejan sin reinstalar el paquete. El extra \texttt{[dev]} instala únicamente las
+herramientas necesarias para desarrollar y validar.
+
+\subsection{Qué contiene pyproject.toml}
+
+\texttt{pyproject.toml} centraliza:
+
+\begin{itemize}
+  \item nombre, versión y versión mínima de Python;
+  \item sistema de construcción basado en Setuptools;
+  \item dependencias de desarrollo;
+  \item configuración de Pytest, Ruff y Bandit;
+  \item ubicación del paquete dentro de \texttt{src/}.
+\end{itemize}
+
+Las dependencias de validación incluyen Ruff, Pytest, SQLFluff, Yamllint, Bandit,
+\texttt{detect-secrets} y \texttt{pip-audit}. No son servicios cloud: son programas ejecutados en el
+equipo local o en un runner de GitHub Actions.
+
+\section{Validaciones de código y seguridad}
+
+\begin{longtable}{p{0.20\textwidth}p{0.35\textwidth}p{0.36\textwidth}}
+\toprule
+\textbf{Herramienta} & \textbf{Qué valida} & \textbf{Qué evita} \\
+\midrule
+\endhead
+Ruff & Estilo, imports, errores Python y formato. & Código inconsistente, imports sin usar y defectos simples. \\
+Pytest & Comportamiento esperado mediante pruebas. & Cambios que rompen reglas ya verificadas. \\
+SQLFluff & Sintaxis y estilo SQL con dialecto Databricks. & SQL difícil de revisar o incompatible con las reglas elegidas. \\
+Yamllint & Estructura y estilo de archivos YAML. & Workflows mal indentados o configuración ambigua. \\
+Bandit & Análisis estático de seguridad para Python. & Patrones inseguros conocidos dentro del código. \\
+detect-secrets & Patrones y entropía compatibles con secretos. & Tokens o claves enviados accidentalmente a Git. \\
+pip-audit & Vulnerabilidades publicadas de dependencias. & Usar versiones con CVE o avisos de seguridad conocidos. \\
+Terraform validate & Sintaxis, tipos y relaciones de configuración. & Planes inválidos antes de contactar Azure. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Pruebas implementadas}
+
+El módulo \texttt{config.py} modela tres valores obligatorios: entorno, catálogo y esquema. Las pruebas
+verifican que:
+
+\begin{enumerate}
+  \item una configuración Dev válida se normalice correctamente;
+  \item una variable ausente cause un error explícito;
+  \item un entorno distinto de Dev, QA o Prod sea rechazado.
+\end{enumerate}
+
+Este patrón mueve errores de configuración hacia el inicio del pipeline. Es preferible fallar antes
+de autenticarse o modificar Databricks que descubrir el problema a mitad del despliegue.
+
+\subsection{Qué ocurrió durante la validación real}
+
+La primera ejecución no fue artificialmente perfecta. Encontró:
+
+\begin{itemize}
+  \item imports Python sin normalizar;
+  \item archivos que Ruff deseaba reformatear;
+  \item Yamllint intentando revisar el contenido de \texttt{.venv};
+  \item un salto de línea SQL incorrecto;
+  \item versiones de \texttt{pip}, Pytest y SQLFluff reportadas con vulnerabilidades conocidas.
+\end{itemize}
+
+Las correcciones fueron: ordenar y formatear Python, excluir \texttt{.venv} del lint YAML, corregir el
+SQL, actualizar los rangos de dependencias y repetir todas las validaciones. El resultado final fue:
+
+\begin{itemize}
+  \item tres pruebas unitarias aprobadas;
+  \item Ruff, SQLFluff y Yamllint aprobados;
+  \item Bandit sin incidencias;
+  \item detección de secretos aprobada;
+  \item \texttt{pip-audit} sin vulnerabilidades conocidas en las dependencias auditables.
+\end{itemize}
+
+Esto ilustra el propósito de CI: convertir problemas reproducibles en feedback antes del merge.
+
+\section{Terraform desde cero}
+
+\subsection{Conceptos esenciales}
+
+\begin{description}[style=nextline,leftmargin=0pt]
+  \item[Provider] Plugin que traduce Terraform a la API de una plataforma. Aquí se usan AzureRM y Databricks.
+  \item[Resource] Objeto que Terraform crea o administra, por ejemplo un resource group o catálogo.
+  \item[Variable] Entrada configurable; evita codificar IDs o valores de entorno dentro de los recursos.
+  \item[Output] Dato producido por una capa para uso humano o para configurar la siguiente.
+  \item[Module] Conjunto reutilizable de recursos con entradas y salidas.
+  \item[State] Registro que vincula la configuración con recursos reales. Puede contener datos sensibles.
+  \item[Lockfile] Archivo que fija las versiones exactas de providers y sus hashes.
+\end{description}
+
+\subsection{Ciclo de comandos}
+
+\begin{lstlisting}[language=bash]
+terraform init
+terraform fmt -check
+terraform validate
+terraform plan -out=tfplan
+terraform apply tfplan
+\end{lstlisting}
+
+\texttt{init} prepara providers; \texttt{fmt} revisa formato; \texttt{validate} comprueba la
+configuración; \texttt{plan} muestra cambios propuestos; \texttt{apply} ejecuta exactamente el plan.
+Sólo los dos últimos requieren valores y permisos cloud reales, y sólo \texttt{apply} crea o modifica
+recursos.
+
+\subsection{Por qué existen dos capas}
+
+\textbf{Capa Azure:} crea el contenedor cloud y el workspace. Incluye el presupuesto y etiquetas de
+costos. Usa el provider AzureRM.
+
+\textbf{Capa Databricks:} se ejecuta cuando el workspace ya responde. Crea la identidad Databricks,
+política OIDC, permisos, catálogo, esquema, carpeta del proyecto y ruta protegida para el estado del
+Bundle. Usa providers Databricks a nivel de cuenta y workspace.
+
+Separarlas evita intentar configurar una API que todavía no existe y permite destruir primero los
+objetos internos, y luego el workspace.
+
+\subsection{State local y archivos ignorados}
+
+En esta fase el state comienza local para facilitar el aprendizaje. Los patrones \texttt{*.tfstate},
+\texttt{*.tfvars} y \texttt{*.tfplan} están ignorados. Los ejemplos
+\texttt{terraform.tfvars.example} sí se versionan porque sólo contienen marcadores ficticios.
+
+Antes de añadir QA, el state se migrará a Azure Storage con cifrado, control de acceso, versionado y
+bloqueo. El state nunca debe pegarse en tickets ni enviarse por correo.
+
+\subsection{Validación efectuada}
+
+Se descargó temporalmente Terraform 1.13.4 con verificación SHA-256 para validar compatibilidad. Se
+ejecutaron \texttt{fmt}, \texttt{init -backend=false} y \texttt{validate} sobre ambas capas. Los
+providers quedaron fijados por lockfiles. El workflow de CI solicita Terraform 1.16.5.
+
+\texttt{-backend=false} significa que la validación no intentó configurar state remoto. No se ejecutó
+\texttt{plan} ni \texttt{apply}; por tanto, no hubo cambios en Azure.
+
+\section{Infraestructura Azure definida}
+
+La capa Azure declara:
+
+\begin{itemize}
+  \item un resource group para Dev;
+  \item un workspace Azure Databricks Premium;
+  \item un managed resource group con nombre controlado;
+  \item etiquetas \texttt{project}, \texttt{environment}, \texttt{owner} y \texttt{managed\_by};
+  \item un presupuesto mensual con alertas al 50, 75, 90 y 100 por ciento.
+\end{itemize}
+
+El módulo restringe intencionalmente \texttt{environment} a \texttt{dev}. Esto hace que intentar crear
+QA o Prod en la fase equivocada falle durante la validación.
+
+Azure Budgets alerta, pero no corta el consumo. Además, el importe está expresado en la moneda de
+facturación de la suscripción, no necesariamente en soles. Antes del primer \texttt{apply} se debe
+convertir S/200 con margen conservador y confirmar la región.
+
+\section{Configuración Databricks definida}
+
+La segunda capa declara:
+
+\begin{itemize}
+  \item un service principal exclusivo para CI/CD Dev;
+  \item asignación del principal al workspace con rol de usuario, no administrador;
+  \item una política de federación OIDC limitada al repositorio y GitHub Environment \texttt{dev};
+  \item la carpeta normal \texttt{/Workspace/data/proyecto\_test};
+  \item la ruta protegida \texttt{/Workspace/.cicd/proyecto\_test/dev};
+  \item \texttt{CAN\_MANAGE} para CI/CD y edición temporal para desarrolladores en Dev;
+  \item catálogo \texttt{proyecto\_dev} y esquema \texttt{cicd};
+  \item permisos de datos específicos para la identidad del pipeline.
+\end{itemize}
+
+El catálogo y el esquema usan \texttt{force\_destroy = false}. Si contienen datos, Terraform debe
+negarse a eliminarlos automáticamente. Es una barrera contra destrucción accidental.
+
+\section{GitHub Actions: validación del Pull Request}
+
+El workflow \texttt{validate-pr.yml} se dispara ante un PR hacia \texttt{main} o manualmente. Declara
+\texttt{contents: read} y no recibe credenciales cloud.
+
+\subsection{Jobs de CI}
+
+\begin{enumerate}
+  \item \textbf{Python, SQL and YAML}: instala el proyecto y ejecuta Ruff, SQLFluff, Yamllint y Pytest.
+  \item \textbf{Security checks}: ejecuta detección de secretos, Bandit y \texttt{pip-audit}.
+  \item \textbf{Terraform static validation}: revisa formato, inicializa sin backend y valida ambas capas.
+\end{enumerate}
+
+Los jobs usan \texttt{timeout-minutes}; la concurrencia cancela validaciones antiguas del mismo PR.
+Las acciones principales están fijadas a SHA completos con un comentario que indica la versión legible.
+
+\subsection{Por qué el PR no posee secretos}
+
+Un contribuidor podría modificar el código que ejecuta CI. Entregar credenciales a ese proceso
+permitiría exfiltrarlas. Por eso la validación de PR sólo analiza código y no usa \texttt{id-token:
+write}, tokens Databricks ni secretos de Azure.
+
+\section{GitHub Actions: despliegue Dev}
+
+\texttt{deploy-dev.yml} se ejecuta después de un push a \texttt{main}, normalmente producido por un
+merge aprobado. Usa el GitHub Environment \texttt{dev} y declara sólo:
+
+\begin{lstlisting}
+permissions:
+  contents: read
+  id-token: write
+\end{lstlisting}
+
+\texttt{id-token: write} no da permisos generales de escritura en GitHub. Permite pedir un token OIDC
+temporal que Databricks validará contra la política configurada.
+
+\subsection{Secuencia exacta del job}
+
+\begin{enumerate}
+  \item Descarga exactamente \texttt{github.sha}.
+  \item Valida variables obligatorias sin imprimir sus valores.
+  \item Instala la CLI oficial con \texttt{databricks/setup-cli}.
+  \item Comprueba la identidad OIDC mediante \texttt{databricks current-user me}.
+  \item Valida y despliega el Bundle parametrizado con \texttt{github.sha}.
+  \item Reconcilia rutas, tipos y hashes contra un manifiesto del repositorio.
+  \item Elimina archivos manuales y restaura contenido modificado o eliminado.
+  \item Ejecuta el Job serverless de humo declarado por el Bundle.
+  \item Escribe un resumen con commit, ruta y entorno, sin secretos.
+\end{enumerate}
+
+La concurrencia \texttt{databricks-dev} impide dos despliegues simultáneos. El Bundle conserva una
+identidad de despliegue y una segunda ejecución del mismo SHA debe producir el mismo estado.
+
+\section{OIDC y mínimo privilegio}
+
+\concepto{OIDC} permite que GitHub demuestre ante Databricks qué repositorio y environment ejecutan el
+job. Databricks intercambia esa prueba por una credencial temporal. No existe un PAT de larga duración
+guardado en GitHub.
+
+La política acepta un subject similar a:
+
+\begin{lstlisting}
+repo:OWNER/REPOSITORY:environment:dev
+\end{lstlisting}
+
+Si el repositorio se renombra, transfiere o intenta usar otro environment, la autenticación falla. Es
+un control positivo, no un inconveniente.
+
+El service principal no es workspace admin. Sólo recibe acceso al workspace, a la carpeta del
+proyecto, al estado del Bundle y al catálogo necesarios. QA y Prod tendrán identidades diferentes.
+
+\section{Bundle, carpeta normal y smoke test}
+
+El árbol local \texttt{proyecto\_test/} se publica bajo
+\texttt{/Workspace/data/proyecto\_test}. No aparece como Git Folder. El archivo
+\texttt{databricks.yml} define targets y rutas; \texttt{resources/} define Jobs. El estado técnico
+vive fuera de la carpeta editable, bajo \texttt{/Workspace/.cicd}.
+
+Un manifiesto calcula la ruta remota, tipo y SHA-256 de cada archivo. Después de desplegar, el pipeline
+elimina objetos desconocidos y compara el contenido exportado. Sus guardas rechazan rutas amplias como
+\texttt{/Workspace} o \texttt{/Workspace/data}; sólo puede limpiar la carpeta exacta del proyecto.
+
+El smoke test es deliberadamente pequeño:
+
+\begin{lstlisting}[language=Python]
+result = spark.sql("SELECT 1 AS pipeline_is_healthy").first()
+assert result.pipeline_is_healthy == 1
+\end{lstlisting}
+
+No prueba toda la lógica del proyecto. Confirma que autenticación, Bundle, reconciliación, lectura del
+notebook y cómputo serverless funcionan juntos. Las pruebas de negocio crecerán después sin usar datos
+reales.
+
+\subsection{Debugging manual en Dev y QA}
+
+Los desarrolladores pueden modificar archivos y notebooks en Dev y QA para diagnosticar. Esos cambios
+son temporales: deben copiarse a una rama y pasar por PR. El siguiente despliegue restaura lo que
+existe en Git, recrea eliminados y borra agregados manualmente. No existe sincronización automática
+workspace a Git. Prod permanece sin edición manual para desarrolladores.
+
+\section{Flujo completo de un cambio}
+
+\begin{enumerate}
+  \item El desarrollador crea \texttt{feature/descripcion} desde \texttt{main}.
+  \item Trabaja localmente dentro de \texttt{.venv} y ejecuta linters y pruebas.
+  \item Abre un PR a \texttt{main}.
+  \item GitHub ejecuta calidad, seguridad y Terraform sin credenciales cloud.
+  \item Una revisión humana aprueba y se realiza squash merge.
+  \item El push resultante a \texttt{main} inicia el workflow Dev.
+  \item OIDC entrega una identidad temporal de mínimo privilegio.
+  \item Databricks despliega el Bundle y reconcilia la carpeta contra el SHA.
+  \item Se ejecuta el smoke test serverless.
+  \item El resultado y el SHA quedan registrados en GitHub Actions.
+\end{enumerate}
+
+En la fase futura, un tag \texttt{v0.1.0-rc.1} seleccionará un SHA para QA. Si pasa, el tag final
+\texttt{v0.1.0} apuntará al mismo SHA y será elegible para Prod.
+
+\section{Controles de costo}
+
+La estrategia para acercarse a S/200 mensuales es:
+
+\begin{itemize}
+  \item crear sólo Dev al inicio;
+  \item usar serverless o cómputo efímero;
+  \item no mantener clústeres clásicos permanentes;
+  \item revisar costos y forecast después de cada práctica;
+  \item usar alertas progresivas;
+  \item destruir el laboratorio si aparece gasto inesperado;
+  \item crear QA y Prod sólo cuando exista una prueba que justifique su costo.
+\end{itemize}
+
+El orden seguro de destrucción es configuración Databricks primero y capa Azure después. Siempre se
+revisa \texttt{terraform plan -destroy} antes de aplicar la destrucción.
+
+\section{Archivos de seguridad y reproducibilidad}
+
+\subsection{.gitignore}
+
+Excluye \texttt{.venv}, caches, archivos \texttt{.env}, certificados, \texttt{terraform.tfvars},
+planes y states. Mantiene versionados los ejemplos sin credenciales.
+
+\subsection{Lockfiles Terraform}
+
+Los archivos \texttt{.terraform.lock.hcl} registran provider, versión seleccionada y hashes. Sí deben
+versionarse: permiten que CI y otros equipos utilicen la misma versión validada.
+
+\subsection{Dependabot}
+
+Revisa semanalmente dependencias Python, GitHub Actions y providers Terraform. Una actualización no se
+aplica directamente: genera un PR que debe pasar por los mismos checks.
+
+\section{Qué significa ``listo'' en este punto}
+
+\estado{Listo localmente}
+
+\begin{itemize}
+  \item código y configuración escritos;
+  \item pruebas y linters aprobados;
+  \item dependencias auditadas;
+  \item Terraform inicializado y validado sin backend;
+  \item documentación y ADRs disponibles.
+\end{itemize}
+
+\estado{Pendiente de credenciales y autorización humana}
+
+\begin{itemize}
+  \item alta Pay-As-You-Go y MFA;
+  \item elección de región y conversión del presupuesto a la moneda de facturación;
+  \item creación del remoto público GitHub;
+  \item primer plan Azure con valores reales;
+  \item revisión conjunta y primer apply;
+  \item configuración de variables del GitHub Environment Dev;
+  \item primera ejecución real del pipeline.
+\end{itemize}
+
+\section{Glosario breve}
+
+\begin{description}[style=nextline,leftmargin=0pt]
+  \item[CI] Integración continua: validación automática de cada cambio.
+  \item[CD] Entrega o despliegue continuo: promoción automatizada y controlada.
+  \item[Runner] Máquina efímera donde GitHub ejecuta un job.
+  \item[Workflow] Archivo YAML que define eventos y jobs de GitHub Actions.
+  \item[Environment] Frontera GitHub para variables, secretos y aprobaciones de un entorno.
+  \item[Service principal] Identidad no humana usada por automatización.
+  \item[OIDC] Federación que proporciona credenciales temporales sin secreto persistente.
+  \item[SAST] Análisis estático de seguridad del código.
+  \item[SCA] Análisis de vulnerabilidades de dependencias.
+  \item[Idempotencia] Repetir una operación produce el mismo estado, sin duplicados.
+  \item[Smoke test] Prueba pequeña que confirma que el camino crítico funciona.
+  \item[Unity Catalog] Capa de gobierno y permisos para datos y objetos Databricks.
+  \item[Release candidate] Versión candidata para QA, todavía no productiva.
+\end{description}
+
+\section{Próximo recorrido recomendado}
+
+\begin{enumerate}
+  \item Leer \texttt{docs/01-azure-account-and-cost.md} y crear la suscripción personalmente.
+  \item Confirmar moneda de facturación, presupuesto equivalente y región disponible.
+  \item Crear el repositorio GitHub público y publicar el commit inicial.
+  \item Instalar Azure CLI y Terraform desde fuentes oficiales.
+  \item Completar \texttt{terraform.tfvars} local sin versionarlo.
+  \item Ejecutar juntos \texttt{terraform plan}; explicar cada alta, cambio o destrucción.
+  \item Sólo después de revisar el plan, autorizar \texttt{terraform apply} para Dev.
+  \item Configurar Databricks y GitHub Environment Dev.
+  \item Abrir un PR de prueba y observar cada job.
+  \item Medir costo real antes de decidir la creación de QA.
+\end{enumerate}
+
+\vfill
+\begin{center}
+  \color{dbcyan}\textbf{Principio rector: entender cada cambio antes de automatizarlo.}
+\end{center}
+
+\end{document}

@@ -1,0 +1,49 @@
+bundle:
+  name: proyecto_test
+
+include:
+  - resources/*.yml
+
+# Sólo este árbol se publica como archivos del proyecto. La configuración del
+# Bundle, tests locales y documentación permanecen fuera del workspace.
+sync:
+  paths:
+    - ./proyecto_test
+
+variables:
+  git_sha:
+    description: Commit inmutable que origina el despliegue.
+    default: local-development
+  catalog:
+    description: Catálogo Unity Catalog del ambiente.
+    default: proyecto_dev
+  schema:
+    description: Esquema aislado para las pruebas del pipeline.
+    default: cicd
+
+workspace:
+  # sync.paths conserva el directorio proyecto_test bajo esta raíz.
+  file_path: /Workspace/data
+  # El estado del Bundle nunca comparte carpeta con los archivos editables.
+  root_path: /Workspace/.cicd/${bundle.name}/${bundle.target}
+  state_path: /Workspace/.cicd/${bundle.name}/${bundle.target}/state
+  artifact_path: /Workspace/.cicd/${bundle.name}/${bundle.target}/artifacts
+
+targets:
+  dev:
+    mode: development
+    default: true
+    presets:
+      name_prefix: "[dev] "
+
+  # Se habilitará después de validar Dev y crear el workspace QA.
+  qa:
+    mode: production
+    presets:
+      name_prefix: "[qa] "
+
+  # Se habilitará después de validar QA. Prod sólo acepta tags finales.
+  prod:
+    mode: production
+    presets:
+      name_prefix: "[prod] "
