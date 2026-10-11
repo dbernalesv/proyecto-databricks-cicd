@@ -38,6 +38,9 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ### Fixed
 
+- Corregida la política OIDC de Dev para usar el `sub` inmutable de GitHub (nombres e IDs numéricos)
+  y el `audience` del endpoint OIDC descubierto por la CLI oficial.
+
 ### Security
 
 - Elevado el mínimo de `setuptools` a `83.0.0` en el paquete y en CI para corregir
