@@ -29,10 +29,10 @@ y ejecutó correctamente el smoke test serverless. Una segunda ejecución sobre 
 un archivo modificado, eliminó un archivo agregado manualmente y no duplicó el Job, confirmando
 reconciliación e idempotencia. No quedaron ejecuciones ni cómputo activos.
 
-La fase actual prepara un backend remoto de Terraform en Azure Storage antes de crear QA. Una pila
-bootstrap independiente crea el contenedor privado y concede al operador acceso de datos mediante
-Microsoft Entra. Los estados Azure y Databricks seguirán separados en blobs diferentes; no se usan
-claves de Storage, SAS ni secretos persistentes.
+El backend remoto Terraform ya está operativo en Azure Storage. Una pila bootstrap independiente creó
+el contenedor privado y concede acceso de datos únicamente a los operadores declarados mediante
+Microsoft Entra. Los states Azure y Databricks Dev se migraron a blobs diferentes y ambos planes
+posteriores mostraron `No changes`; no se usan claves de Storage, SAS ni secretos persistentes.
 
 ## Objetivos del proyecto
 
@@ -219,8 +219,8 @@ puede administrarse opcionalmente con `manage_budget = true`, pero se deja desac
 porque el presupuesto inicial del laboratorio ya se creó en Azure Portal;
 `infra/databricks/dev` configura OIDC, permisos, Unity Catalog y carpetas normales del workspace.
 `infra/bootstrap/tfstate` crea una cuenta Azure Storage compartida para el backend. Su pequeño state
-permanece local como excepción bootstrap; los states de las dos capas Dev se migran a blobs separados
-antes de añadir QA. Consulta la [guía de Terraform](docs/02-terraform-learning-guide.md#backend-remoto-en-azure-storage).
+permanece local como excepción bootstrap; los states de las dos capas Dev ya residen en blobs separados.
+Consulta la [guía de Terraform](docs/02-terraform-learning-guide.md#backend-remoto-en-azure-storage).
 
 Cuando Terraform administra un presupuesto, se define en la moneda de facturación de Azure. Las alertas
 no detienen recursos: al

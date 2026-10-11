@@ -34,3 +34,10 @@ de un uso corporativo se evaluará Private Endpoint o un runner dentro de una re
 - El bootstrap local requiere custodia y respaldo seguro del equipo.
 - La cuenta Storage añade un costo operativo pequeño y debe permanecer bajo el budget.
 - La migración se hace de una capa por vez y sólo se acepta con `state list` completo y plan estable.
+
+## Resultado
+
+El 11 de octubre de 2026 se creó el backend y se migraron primero Azure Dev y después Databricks Dev.
+Cada identidad demostró acceso por Entra, ambos blobs conservaron el tamaño de su respaldo local y los
+planes posteriores devolvieron `No changes`. No se modificaron recursos administrados durante la
+migración.
