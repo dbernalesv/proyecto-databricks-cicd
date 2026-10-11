@@ -1,7 +1,9 @@
 locals {
-  project_path = "/Workspace/data/proyecto_test"
-  cicd_path    = "/Workspace/.cicd/proyecto_test/dev"
-  schema_name  = "cicd"
+  project_path         = "/Workspace/data/proyecto_test"
+  cicd_path            = "/Workspace/.cicd/proyecto_test/dev"
+  schema_name          = "cicd"
+  github_oidc_subject  = "repo:${var.github_owner}@${var.github_owner_id}/${var.github_repository}@${var.github_repository_id}:environment:dev"
+  github_oidc_audience = "${trimsuffix(var.databricks_host, "/")}/oidc/v1/token"
 }
 
 resource "databricks_service_principal" "github_dev" {
@@ -47,9 +49,9 @@ resource "databricks_service_principal_federation_policy" "github_dev" {
 
   oidc_policy = {
     issuer        = "https://token.actions.githubusercontent.com"
-    audiences     = [var.databricks_account_id]
+    audiences     = [local.github_oidc_audience]
     subject_claim = "sub"
-    subject       = "repo:${var.github_owner}/${var.github_repository}:environment:dev"
+    subject       = local.github_oidc_subject
   }
 }
 

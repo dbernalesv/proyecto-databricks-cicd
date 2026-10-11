@@ -11,14 +11,16 @@ edición manual durante la operación normal.
 
 ## Estado actual del laboratorio
 
-El entorno Dev ya fue aprovisionado en `eastus2`. Los planes finales de las capas Azure y Databricks
-son estables (`No changes`). Están creados el workspace, la identidad CI/CD federada, el grupo
+El entorno Dev ya fue aprovisionado en `eastus2`. La capa Azure permanece estable (`No changes`).
+Están creados el workspace, la identidad CI/CD federada, el grupo
 `data-engineers`, las carpetas administradas, el catálogo del workspace y el esquema `cicd`. El budget
 mensual de USD 58 se creó manualmente y Terraform no lo duplica. QA y Prod permanecen sin crear.
 
-Al cierre de la sesión del 9 de octubre de 2026 no había clústeres, SQL warehouses ni jobs en
-ejecución. La siguiente fase es retirar el rol Global Administrator usado temporalmente durante el
-bootstrap y conectar el GitHub Environment `dev` mediante OIDC.
+El rol Global Administrator temporal ya fue retirado, el repositorio y sus checks están publicados y
+`main` está protegido. El primer intercambio OIDC falló de forma segura antes de modificar Databricks
+porque GitHub emitió el formato inmutable nuevo del subject. La política Terraform se ajusta al claim
+exacto y al audience descubierto por la CLI antes de reintentar el despliegue. No había clústeres, SQL
+warehouses ni jobs en ejecución al iniciar esta corrección.
 
 ## Objetivos del proyecto
 

@@ -25,14 +25,29 @@ Crea un GitHub Environment llamado exactamente `dev` y añade variables, no secr
 | `DATABRICKS_CATALOG` | output de `infra/databricks/dev` |
 | `DATABRICKS_SCHEMA` | output de `infra/databricks/dev` |
 
-Restringe el environment a la rama protegida `main`. El subject OIDC configurado por Terraform es:
+Restringe el environment a la rama protegida `main`. Para repositorios creados, renombrados o
+transferidos desde el 15 de julio de 2026, GitHub emite un `sub` inmutable que incorpora los IDs
+numéricos del propietario y del repositorio. Terraform configura exactamente ese formato:
 
 ```text
-repo:OWNER/REPOSITORY:environment:dev
+repo:OWNER@OWNER_ID/REPOSITORY@REPOSITORY_ID:environment:dev
 ```
 
-Si se renombra o transfiere el repositorio, primero actualiza Terraform; de lo contrario OIDC fallará,
-que es el comportamiento seguro.
+Los nombres facilitan la lectura y los IDs impiden que un repositorio distinto herede la confianza si
+se reutiliza un nombre. Se obtienen del claim real o de la API de GitHub; no son secretos. Databricks
+compara el `sub` de forma exacta. El `audience` se deriva del host como
+`https://<workspace>/oidc/v1/token`, que es el valor que la CLI obtiene de los metadatos del workspace.
+
+Si se renombra o transfiere el repositorio, primero actualiza y aplica Terraform; de lo contrario OIDC
+fallará, que es el comportamiento seguro. No relajes el patrón ni sustituyas los IDs por comodines.
+
+### Diagnóstico del primer intercambio OIDC
+
+El primer despliegue real llegó hasta `databricks current-user me` y falló antes de modificar el
+workspace. El log mostró `TOKEN_SUBJECT_INVALID`: la política usaba el formato antiguo por nombre,
+pero el JWT contenía el formato inmutable. También mostró el `audience` resuelto automáticamente por
+la CLI. La corrección se hizo en Terraform, no mediante una credencial persistente ni una excepción
+manual, para mantener la política auditable e idempotente.
 
 ## Flujo de aprendizaje
 

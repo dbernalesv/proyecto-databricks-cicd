@@ -28,9 +28,29 @@ variable "github_owner" {
   type        = string
 }
 
+variable "github_owner_id" {
+  description = "ID numérico inmutable del usuario u organización propietaria en GitHub."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.github_owner_id))
+    error_message = "github_owner_id debe contener únicamente dígitos."
+  }
+}
+
 variable "github_repository" {
   description = "Nombre del repositorio GitHub."
   type        = string
+}
+
+variable "github_repository_id" {
+  description = "ID numérico inmutable del repositorio en GitHub."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.github_repository_id))
+    error_message = "github_repository_id debe contener únicamente dígitos."
+  }
 }
 
 variable "developer_group_name" {

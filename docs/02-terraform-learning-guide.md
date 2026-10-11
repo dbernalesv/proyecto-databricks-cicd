@@ -72,7 +72,9 @@ no puedas explicar.
 El Account ID, Workspace ID y Application/Client ID representan objetos distintos. Deben almacenarse
 en variables con nombres explícitos y nunca inferirse unos de otros. Para el repositorio GitHub,
 `github_owner` recibe el usuario u organización y `github_repository` sólo el nombre del repositorio,
-no la URL completa.
+no la URL completa. `github_owner_id` y `github_repository_id` conservan las identidades numéricas
+inmutables que GitHub incluye en el claim OIDC de repositorios nuevos. Estos IDs son metadatos públicos,
+no credenciales, pero deben coincidir exactamente con el token emitido.
 
 El catálogo administrado del workspace se consulta como un `data` source y no se recrea. Esto permite
 usar Default Storage sin introducir una cuenta de almacenamiento propia sólo para el laboratorio. El
