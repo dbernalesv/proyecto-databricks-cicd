@@ -42,6 +42,8 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   y el `audience` del endpoint OIDC descubierto por la CLI oficial.
 - Administrado explícitamente el entitlement mínimo `workspace_access` del service principal CI/CD,
   requerido por la CLI después de completar correctamente el intercambio OIDC.
+- Corregido el target Bundle de Dev para representar un despliegue compartido administrado por CI,
+  sin las restricciones de rutas y prefijos por usuario de `mode: development`.
 
 ### Security
 

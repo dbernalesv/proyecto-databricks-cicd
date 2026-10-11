@@ -56,6 +56,19 @@ bloqueo estaba en su autorización dentro del workspace. La solución de mínimo
 únicamente `workspace_access = true` mediante Terraform. No se habilita SQL ni creación irrestricta de
 cómputo. El job volvió a detenerse antes del Bundle, la reconciliación y el smoke test.
 
+### Diagnóstico de la primera validación del Bundle
+
+Después de conceder `workspace_access`, OIDC y `databricks current-user me` finalizaron correctamente.
+La validación del Bundle rechazó el target porque `mode: development` exige que `root_path` y el
+prefijo incluyan al usuario actual. Ese modo está diseñado para copias personales y aisladas por
+desarrollador; este laboratorio utiliza una única copia Dev compartida administrada por CI.
+
+Los modos de despliegue son opcionales. El target Dev omite `mode`, mantiene un `name_prefix` explícito
+y conserva `/Workspace/.cicd/proyecto_test/dev` como raíz estable protegida. No se cambió a
+`mode: production`, porque ese modo incorpora validaciones adicionales de `run_as` y permisos que se
+configurarán deliberadamente cuando el modelo de ejecución lo requiera. La decisión se documenta en
+[ADR 0007](adr/0007-shared-ci-dev-bundle-target.md).
+
 ## Flujo de aprendizaje
 
 1. Crea `feature/...` y abre PR hacia `main`.
