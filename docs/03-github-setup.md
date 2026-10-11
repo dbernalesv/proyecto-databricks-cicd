@@ -49,6 +49,13 @@ pero el JWT contenía el formato inmutable. También mostró el `audience` resue
 la CLI. La corrección se hizo en Terraform, no mediante una credencial persistente ni una excepción
 manual, para mantener la política auditable e idempotente.
 
+El segundo intento superó el intercambio OIDC y llegó nuevamente a `databricks current-user me`. Esta
+vez la API respondió que la identidad no tenía `workspace-access`, `workspace-consume` ni
+`databricks-sql-access`. Ese mensaje demuestra que el token ya identificaba al service principal; el
+bloqueo estaba en su autorización dentro del workspace. La solución de mínimo privilegio es administrar
+únicamente `workspace_access = true` mediante Terraform. No se habilita SQL ni creación irrestricta de
+cómputo. El job volvió a detenerse antes del Bundle, la reconciliación y el smoke test.
+
 ## Flujo de aprendizaje
 
 1. Crea `feature/...` y abre PR hacia `main`.
