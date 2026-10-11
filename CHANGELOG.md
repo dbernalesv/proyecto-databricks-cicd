@@ -54,6 +54,8 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ### Security
 
+- Parametrizado el acceso de operadores adicionales al backend para que la identidad organizacional
+  de Databricks use state remoto sin claves, SAS ni credenciales compartidas.
 - Elevado el mínimo de `setuptools` a `83.0.0` en el paquete y en CI para corregir
   `PYSEC-2026-3447`, detectado por `pip-audit` durante el primer PR real.
 - La identidad CI/CD conserva deshabilitados el acceso SQL y la creación general de clústeres e

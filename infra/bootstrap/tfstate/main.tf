@@ -59,3 +59,12 @@ resource "azurerm_role_assignment" "terraform_operator" {
   principal_id         = data.azurerm_client_config.current.object_id
   principal_type       = "User"
 }
+
+resource "azurerm_role_assignment" "additional_state_operators" {
+  for_each = var.additional_state_operator_object_ids
+
+  scope                = "${azurerm_storage_account.tfstate.id}/blobServices/default/containers/${azurerm_storage_container.tfstate.name}"
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = each.value
+  principal_type       = "User"
+}

@@ -1,3 +1,9 @@
 subscription_id = "00000000-0000-0000-0000-000000000000"
 location        = "eastus2"
 owner           = "tu-alias"
+
+# El operador adicional administra Terraform Databricks con su identidad
+# organizacional, sin compartir contraseñas ni credenciales persistentes.
+additional_state_operator_object_ids = [
+  "11111111-1111-1111-1111-111111111111",
+]
