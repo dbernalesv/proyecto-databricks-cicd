@@ -6,7 +6,7 @@
 ## Decisión
 
 GitHub se autentica como service principal Databricks mediante OIDC, sin PAT. Azure y Databricks usan
-states separados. El state comienza local y se migrará a Azure Storage antes de QA.
+states separados. El state comenzó local y se migró a Azure Storage antes de QA.
 
 ## Motivo
 
@@ -28,5 +28,6 @@ produzca un plan explícito y requiera revisión.
 
 La migración anunciada se implementa según [ADR 0008](0008-remote-terraform-state.md). Azure y
 Databricks conservan states separados en el mismo contenedor privado, autenticado con Microsoft Entra.
-Sólo el state mínimo de la pila bootstrap permanece local como excepción documentada.
+Sólo el state mínimo de la pila bootstrap permanece local como excepción documentada. La migración de
+ambas capas Dev terminó con inventarios completos y planes `No changes`.
 

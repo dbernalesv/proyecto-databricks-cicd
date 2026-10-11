@@ -232,6 +232,21 @@ delicada y nunca se interrumpe ni se repite a ciegas.
 La configuración usa `use_azuread_auth = true` y `use_cli = true`. La sesión de Azure CLI obtiene
 tokens temporales; no se almacenan claves de Storage, SAS, client secrets ni tokens en el repositorio.
 
+### Resultado de la migración Dev
+
+La migración real se completó el 11 de octubre de 2026 y mantuvo las capas aisladas:
+
+| Capa | Blob remoto | Tamaño inicial | Comprobación posterior |
+|---|---|---:|---|
+| Azure Dev | `dev/azure.tfstate` | 7,412 bytes | `No changes` |
+| Databricks Dev | `dev/databricks.tfstate` | 24,218 bytes | `No changes` |
+
+Para Azure se usó la cuenta propietaria de la suscripción. Para Databricks se usó el usuario
+organizacional, autorizado por Terraform como operador adicional del contenedor. En ambas migraciones,
+Terraform encontró state local y destino vacío, copió el contenido, adquirió y liberó el bloqueo, y
+preservó el inventario completo. Los respaldos locales previos permanecen ignorados hasta completar el
+periodo de observación; no deben añadirse a Git.
+
 ## Destrucción segura
 
 ```bash
