@@ -24,7 +24,15 @@ permiso mínimo de forma explícita, sin conceder acceso SQL ni creación genera
 El siguiente intento autenticó correctamente y llegó a validar el Bundle; allí se detectó que
 `mode: development` no admite rutas CI compartidas. Dev usa ahora un target sin modo predefinido y
 con presets explícitos, conservando la ruta fija y el prefijo `[dev]`. Los intentos fallidos se
-detuvieron antes de desplegar archivos o iniciar cómputo.
+detuvieron antes de desplegar archivos o iniciar cómputo. El flujo completo ya desplegó Dev por OIDC
+y ejecutó correctamente el smoke test serverless. Una segunda ejecución sobre el mismo SHA restauró
+un archivo modificado, eliminó un archivo agregado manualmente y no duplicó el Job, confirmando
+reconciliación e idempotencia. No quedaron ejecuciones ni cómputo activos.
+
+La fase actual prepara un backend remoto de Terraform en Azure Storage antes de crear QA. Una pila
+bootstrap independiente crea el contenedor privado y concede al operador acceso de datos mediante
+Microsoft Entra. Los estados Azure y Databricks seguirán separados en blobs diferentes; no se usan
+claves de Storage, SAS ni secretos persistentes.
 
 ## Objetivos del proyecto
 
@@ -209,8 +217,10 @@ infraestructura y permisos de vida larga; el Bundle mantiene código y recursos 
 Terraform se divide en dos capas. `infra/azure/dev` crea el resource group y workspace. El presupuesto
 puede administrarse opcionalmente con `manage_budget = true`, pero se deja desactivado por defecto
 porque el presupuesto inicial del laboratorio ya se creó en Azure Portal;
-`infra/databricks/dev` configura OIDC, permisos, Unity Catalog y carpetas normales del workspace. El state comienza local
-y permanece ignorado por Git; se migrará a Azure Storage antes de añadir QA.
+`infra/databricks/dev` configura OIDC, permisos, Unity Catalog y carpetas normales del workspace.
+`infra/bootstrap/tfstate` crea una cuenta Azure Storage compartida para el backend. Su pequeño state
+permanece local como excepción bootstrap; los states de las dos capas Dev se migran a blobs separados
+antes de añadir QA. Consulta la [guía de Terraform](docs/02-terraform-learning-guide.md#backend-remoto-en-azure-storage).
 
 Cuando Terraform administra un presupuesto, se define en la moneda de facturación de Azure. Las alertas
 no detienen recursos: al

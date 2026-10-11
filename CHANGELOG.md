@@ -20,6 +20,9 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - Manifiesto de rutas, tipos y hashes con reconciliación limitada a `/Workspace/data/proyecto_test`.
 - Pruebas de guardas de seguridad, notebooks y eliminación de archivos remotos desconocidos.
 - ADR sobre Bundles, carpetas editables y repositorio central de pipelines.
+- Pila bootstrap para backend remoto Terraform en Azure Storage, con versionado, retención y RBAC.
+- Plantillas de backend independientes para los states Azure y Databricks de Dev.
+- Primer despliegue Dev completo por OIDC y smoke test serverless sobre el SHA aprobado.
 
 ### Changed
 
@@ -31,6 +34,10 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - Terraform administra las carpetas y permisos del workspace sin clonar el repositorio.
 - El despliegue Dev llama a un workflow reutilizable preparado para extraerse a un repositorio central.
 - La guía de costos distingue apagar cómputo de destruir infraestructura y registra la comprobación de clústeres, warehouses y jobs detenidos.
+- El state de las capas Dev queda preparado para migrarse a Azure Storage con autenticación Entra;
+  sólo el state mínimo de bootstrap permanece local.
+- Una reejecución del mismo SHA confirmó que el despliegue restaura modificaciones manuales, elimina
+  archivos ajenos al repositorio y no duplica el Job de smoke test.
 
 ### Deprecated
 
