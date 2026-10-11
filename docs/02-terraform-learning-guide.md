@@ -131,11 +131,99 @@ az account get-access-token `
 `--output none` evita imprimir el token. No copies el token a `terraform.tfvars`, logs, issues o
 variables persistentes de GitHub.
 
-## State y secretos
+## Backend remoto en Azure Storage
 
-El state local está excluido de Git, pero no está cifrado por Terraform. Guárdalo sólo en el equipo
-protegido. Antes de incorporar QA se migrará a Azure Storage con cifrado, versionado, bloqueo y acceso
-restringido. Nunca envíes `tfstate` por correo ni lo pegues en un issue.
+El **state** permite que Terraform relacione cada bloque de configuración con el recurso real. Puede
+contener identificadores y datos devueltos por APIs, por lo que no debe versionarse, enviarse por correo
+ni pegarse en un issue. El **backend** determina dónde se guarda y cómo se bloquea ese state.
+
+El laboratorio comenzó con state local para reducir conceptos durante el primer aprovisionamiento.
+Antes de QA se migra a Azure Blob Storage porque ofrece cifrado en reposo, versionado, recuperación de
+borrados y bloqueo nativo para evitar que dos operaciones escriban simultáneamente.
+
+### Por qué existe una pila bootstrap
+
+El backend debe existir antes de que Terraform pueda usarlo. `infra/bootstrap/tfstate` resuelve ese
+problema de arranque y crea:
+
+- un Resource Group compartido y etiquetado;
+- una cuenta StorageV2 `Standard_LRS`, suficiente para archivos de state pequeños;
+- un contenedor privado `tfstate` con versionado y retención de 14 días;
+- una asignación `Storage Blob Data Contributor` al usuario que ejecuta el bootstrap, limitada al
+  contenedor.
+
+La cuenta deshabilita claves compartidas, fuerza autenticación Microsoft Entra y TLS 1.2 como mínimo.
+Mantiene acceso por red pública para que el laboratorio funcione desde una IP doméstica dinámica; esto
+no significa acceso anónimo: el contenedor es privado y exige RBAC. En una plataforma corporativa se
+añadiría firewall, runner con red controlada o Private Endpoint.
+
+El pequeño state de bootstrap permanece local e ignorado por Git. Es una excepción consciente: no
+puede alojarse en el backend que él mismo debe crear. Se conserva protegido y sólo administra estos
+cuatro objetos. Los states de trabajo sí quedan separados:
+
+```text
+tfstate/
+└── dev/
+    ├── azure.tfstate
+    └── databricks.tfstate
+```
+
+Separar las claves evita mezclar ciclos de vida. El workspace puede existir aunque se repare la
+configuración Databricks, y durante una retirada se destruye primero Databricks y luego Azure.
+
+### Crear el backend
+
+Primero inicia sesión con el propietario de la suscripción y confirma el contexto; no continúes si el
+ID o tenant no son los esperados:
+
+```powershell
+az login --tenant "<TENANT_ID>" --use-device-code
+az account set --subscription "<SUBSCRIPTION_ID>"
+az account show --query "{name:name,id:id,tenantId:tenantId,user:user.name}" --output table
+```
+
+Copia `infra/bootstrap/tfstate/terraform.tfvars.example` como `terraform.tfvars` y completa sólo
+suscripción, región y alias. Luego ejecuta desde la raíz:
+
+```powershell
+& ".\.cache\terraform-1.13.4\terraform.exe" -chdir="infra/bootstrap/tfstate" init
+& ".\.cache\terraform-1.13.4\terraform.exe" -chdir="infra/bootstrap/tfstate" fmt -check
+& ".\.cache\terraform-1.13.4\terraform.exe" -chdir="infra/bootstrap/tfstate" validate
+& ".\.cache\terraform-1.13.4\terraform.exe" -chdir="infra/bootstrap/tfstate" plan -out=tfstate.tfplan
+```
+
+Revisa que el plan sólo contenga el Resource Group, Storage Account, contenedor y asignación RBAC.
+`apply` se ejecuta únicamente después de esa revisión y autorización explícita. La cuenta tiene un
+costo pequeño pero no nulo; el budget continúa siendo el control de alerta.
+
+### Migrar los states existentes
+
+Después del `apply`, copia los dos archivos `.tfbackend.example` de `infra/backend/` quitando el
+sufijo `.example`. Completa el nombre de Storage mostrado por el output y los IDs correctos. Los
+archivos reales `*.tfbackend` están ignorados para no convertir parámetros operativos en configuración
+compartida; no deben contener contraseñas, claves ni SAS.
+
+Migra una capa a la vez:
+
+```powershell
+& ".\.cache\terraform-1.13.4\terraform.exe" -chdir="infra/azure/dev" init `
+  -migrate-state -backend-config="..\..\backend\dev.azure.tfbackend"
+
+& ".\.cache\terraform-1.13.4\terraform.exe" -chdir="infra/azure/dev" state list
+& ".\.cache\terraform-1.13.4\terraform.exe" -chdir="infra/azure/dev" plan -input=false
+```
+
+Sólo si la capa Azure conserva todos sus recursos y muestra `No changes`, repite el procedimiento para
+Databricks usando `dev.databricks.tfbackend`. La propagación de RBAC puede tardar algunos minutos; un
+`403` inmediato no se soluciona habilitando claves, sino esperando y comprobando identidad y alcance.
+
+Terraform puede crear copias locales durante la migración. Consérvalas temporalmente, siempre
+ignoradas por Git, hasta comprobar ambos blobs, `state list` y los dos planes estables. La migración no
+crea, cambia ni destruye recursos administrados: mueve la ubicación del state. Aun así es una operación
+delicada y nunca se interrumpe ni se repite a ciegas.
+
+La configuración usa `use_azuread_auth = true` y `use_cli = true`. La sesión de Azure CLI obtiene
+tokens temporales; no se almacenan claves de Storage, SAS, client secrets ni tokens en el repositorio.
 
 ## Destrucción segura
 

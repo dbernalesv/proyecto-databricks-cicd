@@ -24,3 +24,9 @@ Esta decisión evita confiar sólo en nombres reutilizables y conserva autentica
 IDs se mantienen como variables no sensibles para que una transferencia o recreación del repositorio
 produzca un plan explícito y requiera revisión.
 
+## Actualización 2026-10-11: backend remoto
+
+La migración anunciada se implementa según [ADR 0008](0008-remote-terraform-state.md). Azure y
+Databricks conservan states separados en el mismo contenedor privado, autenticado con Microsoft Entra.
+Sólo el state mínimo de la pila bootstrap permanece local como excepción documentada.
+

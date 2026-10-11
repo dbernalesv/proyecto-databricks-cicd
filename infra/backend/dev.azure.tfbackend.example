@@ -1,0 +1,10 @@
+# Copia como dev.azure.tfbackend (queda ignorado por Git) y completa el nombre
+# producido por infra/bootstrap/tfstate. La autenticación usa la sesión de Azure CLI.
+resource_group_name  = "rg-databricks-cicd-tfstate"
+storage_account_name = "stdbcicdtfXXXXXXXXXX"
+container_name       = "tfstate"
+key                  = "dev/azure.tfstate"
+use_azuread_auth     = true
+use_cli              = true
+tenant_id            = "00000000-0000-0000-0000-000000000000"
+subscription_id      = "00000000-0000-0000-0000-000000000000"
