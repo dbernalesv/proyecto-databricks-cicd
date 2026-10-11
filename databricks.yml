@@ -31,8 +31,9 @@ workspace:
 
 targets:
   dev:
-    mode: development
     default: true
+    # Dev es un despliegue compartido y estable administrado por CI. No usa
+    # mode: development, que reserva rutas y nombres únicos por desarrollador.
     presets:
       name_prefix: "[dev] "
 

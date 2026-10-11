@@ -21,7 +21,10 @@ El rol Global Administrator temporal ya fue retirado, el repositorio y sus check
 formato inmutable nuevo del subject; después de corregirlo, el segundo intento confirmó la federación
 y detectó que la identidad carecía del entitlement `workspace_access`. Terraform administra ahora ese
 permiso mínimo de forma explícita, sin conceder acceso SQL ni creación general de clústeres o pools.
-Ambos intentos se detuvieron antes de desplegar archivos o iniciar cómputo.
+El siguiente intento autenticó correctamente y llegó a validar el Bundle; allí se detectó que
+`mode: development` no admite rutas CI compartidas. Dev usa ahora un target sin modo predefinido y
+con presets explícitos, conservando la ruta fija y el prefijo `[dev]`. Los intentos fallidos se
+detuvieron antes de desplegar archivos o iniciar cómputo.
 
 ## Objetivos del proyecto
 
