@@ -17,10 +17,11 @@ Están creados el workspace, la identidad CI/CD federada, el grupo
 mensual de USD 58 se creó manualmente y Terraform no lo duplica. QA y Prod permanecen sin crear.
 
 El rol Global Administrator temporal ya fue retirado, el repositorio y sus checks están publicados y
-`main` está protegido. El primer intercambio OIDC falló de forma segura antes de modificar Databricks
-porque GitHub emitió el formato inmutable nuevo del subject. La política Terraform se ajusta al claim
-exacto y al audience descubierto por la CLI antes de reintentar el despliegue. No había clústeres, SQL
-warehouses ni jobs en ejecución al iniciar esta corrección.
+`main` está protegido. El primer intercambio OIDC falló de forma segura porque GitHub emitió el
+formato inmutable nuevo del subject; después de corregirlo, el segundo intento confirmó la federación
+y detectó que la identidad carecía del entitlement `workspace_access`. Terraform administra ahora ese
+permiso mínimo de forma explícita, sin conceder acceso SQL ni creación general de clústeres o pools.
+Ambos intentos se detuvieron antes de desplegar archivos o iniciar cómputo.
 
 ## Objetivos del proyecto
 

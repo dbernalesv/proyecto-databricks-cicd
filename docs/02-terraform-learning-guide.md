@@ -67,7 +67,8 @@ no puedas explicar.
 4. Copia y completa `infra/databricks/dev/terraform.tfvars.example`, incluidos el catálogo, grupo y usuario desarrollador.
 5. Ejecuta `init`, `fmt -check`, `validate`, `plan` y `apply` desde esa carpeta.
 6. El plan crea el grupo, membresía, service principal Databricks, política OIDC, asignaciones al
-   workspace, esquema, `/Workspace/data/proyecto_test` y la ruta protegida de estado del Bundle.
+   workspace, entitlement mínimo, esquema, `/Workspace/data/proyecto_test` y la ruta protegida de
+   estado del Bundle.
 
 El Account ID, Workspace ID y Application/Client ID representan objetos distintos. Deben almacenarse
 en variables con nombres explícitos y nunca inferirse unos de otros. Para el repositorio GitHub,
@@ -80,6 +81,13 @@ El catálogo administrado del workspace se consulta como un `data` source y no s
 usar Default Storage sin introducir una cuenta de almacenamiento propia sólo para el laboratorio. El
 service principal recibe `USE_CATALOG` en ese catálogo y permisos de escritura únicamente en el esquema
 `cicd`, conservando mínimo privilegio.
+
+La asignación `USER` a nivel de cuenta hace visible el service principal en el workspace, pero no
+garantiza por sí sola que pueda llamar sus APIs. Por eso Terraform resuelve su ID SCIM local y administra
+un `databricks_entitlements` separado con `workspace_access = true`. Se mantienen en `false` el acceso
+SQL, la creación irrestricta de clústeres y la creación de instance pools. Los permisos sobre carpetas,
+catálogo y esquema siguen siendo recursos independientes: un entitlement permite entrar al workspace,
+pero no autoriza automáticamente a modificar todos sus objetos.
 
 Terraform no despliega notebooks en cada cambio. Administra infraestructura y permisos de vida larga;
 `databricks bundle deploy` administra archivos y Jobs desde GitHub Actions.

@@ -18,6 +18,27 @@ resource "databricks_mws_permission_assignment" "github_dev" {
   permissions  = ["USER"]
 }
 
+# La asignación de cuenta incorpora la identidad al workspace. El data source
+# resuelve después su ID SCIM local, requerido por la API de entitlements.
+data "databricks_service_principal" "github_dev_workspace" {
+  provider       = databricks.workspace
+  application_id = databricks_service_principal.github_dev.application_id
+
+  depends_on = [databricks_mws_permission_assignment.github_dev]
+}
+
+resource "databricks_entitlements" "github_dev" {
+  provider             = databricks.workspace
+  service_principal_id = data.databricks_service_principal.github_dev_workspace.sp_id
+
+  # La CLI necesita workspace-access para usar las APIs del workspace. No se
+  # conceden capacidades generales de creación de cómputo ni acceso a SQL.
+  workspace_access           = true
+  databricks_sql_access      = false
+  allow_cluster_create       = false
+  allow_instance_pool_create = false
+}
+
 data "databricks_user" "developer" {
   provider  = databricks.account
   user_name = var.developer_user_name

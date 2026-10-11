@@ -40,11 +40,15 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 - Corregida la política OIDC de Dev para usar el `sub` inmutable de GitHub (nombres e IDs numéricos)
   y el `audience` del endpoint OIDC descubierto por la CLI oficial.
+- Administrado explícitamente el entitlement mínimo `workspace_access` del service principal CI/CD,
+  requerido por la CLI después de completar correctamente el intercambio OIDC.
 
 ### Security
 
 - Elevado el mínimo de `setuptools` a `83.0.0` en el paquete y en CI para corregir
   `PYSEC-2026-3447`, detectado por `pip-audit` durante el primer PR real.
+- La identidad CI/CD conserva deshabilitados el acceso SQL y la creación general de clústeres e
+  instance pools; sus permisos sobre carpetas y Unity Catalog continúan limitados por recursos propios.
 
 <!--
 Al publicar una versión:
