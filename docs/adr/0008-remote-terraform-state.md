@@ -18,6 +18,10 @@ Migrar los states Dev a blobs distintos, `dev/azure.tfstate` y `dev/databricks.t
 backend con Microsoft Entra y Azure CLI, deshabilitar claves compartidas y limitar al operador el rol
 `Storage Blob Data Contributor` al contenedor. Activar versionado y retención de borrados por 14 días.
 
+Cuando las capas necesitan identidades administrativas distintas, el bootstrap acepta Object IDs
+adicionales. La cuenta personal opera Azure y el usuario organizacional opera Databricks; ambos se
+autentican con Entra y sólo las identidades declaradas pueden abrir y bloquear el backend.
+
 Se mantiene temporalmente acceso de red pública para permitir la administración desde una conexión
 doméstica dinámica. El contenedor no es público y todas las operaciones de datos requieren RBAC. Antes
 de un uso corporativo se evaluará Private Endpoint o un runner dentro de una red controlada.

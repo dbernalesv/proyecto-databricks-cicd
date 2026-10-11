@@ -152,6 +152,12 @@ problema de arranque y crea:
 - una asignación `Storage Blob Data Contributor` al usuario que ejecuta el bootstrap, limitada al
   contenedor.
 
+Si Azure y Databricks requieren identidades administrativas diferentes, añade el Object ID del
+operador organizacional en `additional_state_operator_object_ids`. Terraform concede el mismo rol de
+datos al contenedor sin almacenar contraseñas. Esto es necesario porque primero se abre y bloquea el
+backend y después se autentica el provider que administra los recursos. En el laboratorio, la cuenta
+personal opera Azure y el usuario organizacional opera la cuenta Databricks.
+
 La cuenta deshabilita claves compartidas, fuerza autenticación Microsoft Entra y TLS 1.2 como mínimo.
 Mantiene acceso por red pública para que el laboratorio funcione desde una IP doméstica dinámica; esto
 no significa acceso anónimo: el contenedor es privado y exige RBAC. En una plataforma corporativa se
@@ -182,8 +188,9 @@ az account set --subscription "<SUBSCRIPTION_ID>"
 az account show --query "{name:name,id:id,tenantId:tenantId,user:user.name}" --output table
 ```
 
-Copia `infra/bootstrap/tfstate/terraform.tfvars.example` como `terraform.tfvars` y completa sólo
-suscripción, región y alias. Luego ejecuta desde la raíz:
+Copia `infra/bootstrap/tfstate/terraform.tfvars.example` como `terraform.tfvars` y completa
+suscripción, región, alias y cualquier operador adicional. Los Object IDs no son secretos, pero el
+archivo operativo permanece local. Luego ejecuta desde la raíz:
 
 ```powershell
 & ".\.cache\terraform-1.13.4\terraform.exe" -chdir="infra/bootstrap/tfstate" init

@@ -23,3 +23,17 @@ variable "owner" {
     error_message = "owner no puede estar vacío."
   }
 }
+
+variable "additional_state_operator_object_ids" {
+  description = "Object IDs de Entra adicionales autorizados a operar el contenedor de state. No son secretos."
+  type        = set(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for object_id in var.additional_state_operator_object_ids :
+      can(regex("^[0-9a-fA-F-]{36}$", object_id))
+    ])
+    error_message = "Cada Object ID adicional debe tener formato UUID."
+  }
+}
