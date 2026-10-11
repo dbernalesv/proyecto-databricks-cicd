@@ -40,6 +40,9 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ### Security
 
+- Elevado el mínimo de `setuptools` a `83.0.0` en el paquete y en CI para corregir
+  `PYSEC-2026-3447`, detectado por `pip-audit` durante el primer PR real.
+
 <!--
 Al publicar una versión:
 1. Mueve las entradas de Unreleased a una sección como `## [0.1.0] - 2026-10-07`.
