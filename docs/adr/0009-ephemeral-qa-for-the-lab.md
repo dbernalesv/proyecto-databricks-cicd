@@ -1,7 +1,12 @@
 # ADR 0009: QA efímero para el laboratorio
 
-- Estado: Aceptado
+- Estado: Reemplazado por ADR 0010
 - Fecha: 2026-10-11
+
+Esta decisión fue válida con la información de costo disponible ese día. El 11 de octubre se decidió
+conservar QA durante una ventana controlada del laboratorio para practicar promoción y operación
+repetible. El razonamiento actualizado se registra en el ADR 0010; este archivo permanece como
+historial y no debe interpretarse como la política vigente.
 
 ## Contexto
 

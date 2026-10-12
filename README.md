@@ -34,10 +34,11 @@ el contenedor privado y concede acceso de datos únicamente a los operadores dec
 Microsoft Entra. Los states Azure y Databricks Dev se migraron a blobs diferentes y ambos planes
 posteriores mostraron `No changes`; no se usan claves de Storage, SAS ni secretos persistentes.
 
-Cost Management registra actualmente USD 1.96: USD 1.76 de NAT Gateway y USD 0.20 de Virtual Network
-en el Resource Group administrado de Dev. Como el costo base de red existe aun sin clústeres activos,
-QA será efímero en este laboratorio: se creará para un release candidate, se probará y se destruirá al
-finalizar. En una plataforma empresarial, QA normalmente permanecería aprovisionado.
+Cost Management registra actualmente USD 2.42. Como el costo base de red existe aun sin clústeres
+activos, QA se conservará únicamente durante la fase QA del laboratorio y tendrá una fecha de teardown.
+No se creará por Pull Request: se aprovisionará una vez para practicar release candidates, promoción
+inmutable y pruebas repetibles. En una plataforma empresarial, su permanencia responde a requisitos
+de disponibilidad, integración y gobierno, no sólo al costo.
 
 ## Objetivos del proyecto
 
@@ -56,7 +57,7 @@ feature/*
     ├── Pull Request → main
     │       ├── lint Python/SQL
     │       ├── pruebas unitarias y validaciones de seguridad
-    │       └── validación o despliegue efímero en Dev
+    │       └── validación estática sin credenciales cloud
     │
     └── merge a main
             └── sincronización/despliegue en Dev
@@ -200,6 +201,10 @@ Preferimos notebooks en formatos de texto revisables por Git. La lógica de nego
 7. Espera los checks automáticos y corrige cualquier fallo. El PR validará el cambio en Dev.
 8. Tras la aprobación y el merge, comprueba el despliegue de `main` en Dev.
 9. Una versión candidata se etiqueta `vX.Y.Z-rc.N`; tras aprobar QA, el mismo SHA recibe `vX.Y.Z`.
+
+Los merges que cambian únicamente documentación continúan pasando CI, pero no disparan el despliegue
+Dev. El workflow limita el evento `push` a `proyecto_test/`, recursos y automatización que afectan al
+Bundle; `workflow_dispatch` permite una ejecución manual cuando se necesite verificar idempotencia.
 
 ## Ruta de implementación
 

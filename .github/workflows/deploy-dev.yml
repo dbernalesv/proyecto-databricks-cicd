@@ -3,6 +3,16 @@ name: Deploy exact main commit to Dev
 on:
   push:
     branches: [main]
+    # Un merge sólo documental sigue pasando CI, pero no necesita autenticarse
+    # en Databricks ni ejecutar cómputo. Mantén esta lista alineada con el árbol
+    # sincronizado por databricks.yml y con la automatización del despliegue.
+    paths:
+      - "proyecto_test/**"
+      - "resources/**"
+      - "scripts/**"
+      - "databricks.yml"
+      - ".github/workflows/deploy-dev.yml"
+      - ".github/workflows/reusable-databricks-deploy.yml"
   workflow_dispatch:
 
 permissions:
