@@ -60,6 +60,7 @@
 \newcommand{\estado}[1]{\colorbox{lightblue}{\strut\textbf{#1}}}
 
 \begin{document}
+\pagenumbering{gobble}
 
 \begin{titlepage}
   \centering
@@ -75,16 +76,18 @@
   \vfill
   \begin{tabular}{rl}
     Proyecto: & \texttt{proyecto-databricks-cicd} \\
-    Alcance actual: & Entorno Dev preparado, sin recursos cloud creados \\
-    Fecha: & 8 de octubre de 2026 \\
+    Alcance actual: & Dev validado de extremo a extremo \\
+    Fecha de actualización: & 11 de octubre de 2026 \\
     Presupuesto objetivo: & S/200 mensuales \\
   \end{tabular}
   \vfill
   {\small Este documento explica qué se creó, por qué existe cada pieza, cómo se validó y qué falta ejecutar.}
 \end{titlepage}
 
+\pagenumbering{roman}
 \tableofcontents
 \newpage
+\pagenumbering{arabic}
 
 \section{Propósito y estado actual}
 
@@ -106,19 +109,24 @@ después incorporar QA y Prod.
   \item Documentación operativa, reglas de contribución y registros de decisiones arquitectónicas.
 \end{itemize}
 
-\subsection{Qué todavía no se ha ejecutado}
+\subsection{Hitos ya ejecutados}
 
 \begin{itemize}
-  \item No existe todavía una suscripción Azure asociada al proyecto.
-  \item No se ejecutó \texttt{terraform plan} con valores reales ni \texttt{terraform apply}.
-  \item No se creó ningún workspace Databricks y no existe consumo cloud generado por el proyecto.
-  \item No se creó todavía el repositorio remoto de GitHub ni el GitHub Environment \texttt{dev}.
-  \item QA y Prod están diseñados conceptualmente, pero no se aprovisionan en esta fase.
+  \item Suscripción Pay-As-You-Go activa y budget mensual de USD 58 con alertas progresivas.
+  \item Workspace Azure Databricks Dev creado en \texttt{eastus2} mediante Terraform.
+  \item Configuración Databricks aplicada: grupo, usuario organizacional, service principal CI/CD,
+        política OIDC, carpetas, permisos, catálogo administrado y esquema \texttt{cicd}.
+  \item Repositorio GitHub público, rama \texttt{main} protegida y Environment \texttt{dev}.
+  \item Pipeline real completado: PR, checks, merge, OIDC, Bundle, reconciliación y smoke test serverless.
+  \item Prueba de drift e idempotencia: un archivo manual fue eliminado, uno modificado fue restaurado
+        y el Job no se duplicó al redesplegar el mismo SHA.
+  \item States Azure y Databricks migrados a blobs remotos separados, con bloqueo y versionado.
+  \item Costo visible acumulado de USD 1.96, concentrado en NAT Gateway y Virtual Network.
 \end{itemize}
 
-Esta distinción es importante: \concepto{código de infraestructura} no equivale a
-\concepto{infraestructura creada}. Terraform sólo realiza cambios reales cuando se revisa y ejecuta
-un \texttt{apply} autorizado.
+QA y Prod aún no existen. Debido al costo base observado, QA será efímero en este laboratorio: se
+creará para probar un release candidate y se destruirá al terminar. En una plataforma empresarial,
+QA normalmente sería permanente para conservar disponibilidad e integraciones estables.
 
 \subsection{Qué se hace manualmente y qué automatiza Terraform}
 
@@ -127,9 +135,10 @@ suscripción gratuita a Pay-As-You-Go, acepta términos, selecciona la suscripci
 autoriza cada \texttt{apply}. Son decisiones de identidad y facturación que no deben delegarse a un
 pipeline.
 
-Después de ese bootstrap, Terraform crea el Resource Group, presupuesto, workspace Dev, identidad y
-permisos. No se deben crear manualmente esos recursos en el portal. Terraform tampoco despliega cada
-notebook: los Bundles administran el código y Jobs con una cadencia mucho mayor que la infraestructura.
+Después de ese bootstrap, Terraform creó el Resource Group, workspace Dev, identidad y permisos. El
+budget inicial se creó manualmente y Terraform lo reconoce como una frontera operativa para no
+duplicarlo. Terraform tampoco despliega cada notebook: los Bundles administran código y Jobs con una
+cadencia mucho mayor que la infraestructura.
 
 \section{Arquitectura y flujo general}
 
@@ -278,7 +287,7 @@ Las correcciones fueron: ordenar y formatear Python, excluir \texttt{.venv} del 
 SQL, actualizar los rangos de dependencias y repetir todas las validaciones. El resultado final fue:
 
 \begin{itemize}
-  \item tres pruebas unitarias aprobadas;
+  \item trece pruebas unitarias aprobadas;
   \item Ruff, SQLFluff y Yamllint aprobados;
   \item Bandit sin incidencias;
   \item detección de secretos aprobada;
@@ -291,7 +300,7 @@ Esto ilustra el propósito de CI: convertir problemas reproducibles en feedback 
 
 \subsection{Conceptos esenciales}
 
-\begin{description}[style=nextline,leftmargin=0pt]
+\begin{description}[style=nextline,leftmargin=2em]
   \item[Provider] Plugin que traduce Terraform a la API de una plataforma. Aquí se usan AzureRM y Databricks.
   \item[Resource] Objeto que Terraform crea o administra, por ejemplo un resource group o catálogo.
   \item[Variable] Entrada configurable; evita codificar IDs o valores de entorno dentro de los recursos.
@@ -328,23 +337,25 @@ Bundle. Usa providers Databricks a nivel de cuenta y workspace.
 Separarlas evita intentar configurar una API que todavía no existe y permite destruir primero los
 objetos internos, y luego el workspace.
 
-\subsection{State local y archivos ignorados}
+\subsection{Backend remoto y archivos ignorados}
 
-En esta fase el state comienza local para facilitar el aprendizaje. Los patrones \texttt{*.tfstate},
-\texttt{*.tfvars} y \texttt{*.tfplan} están ignorados. Los ejemplos
-\texttt{terraform.tfvars.example} sí se versionan porque sólo contienen marcadores ficticios.
+Los states comenzaron locales para facilitar el aprendizaje y luego se migraron a un contenedor
+privado Azure Storage. Azure Dev usa \texttt{dev/azure.tfstate}; Databricks Dev usa
+\texttt{dev/databricks.tfstate}. Separar claves conserva ciclos de vida y radios de impacto distintos.
 
-Antes de añadir QA, el state se migrará a Azure Storage con cifrado, control de acceso, versionado y
-bloqueo. El state nunca debe pegarse en tickets ni enviarse por correo.
+El backend usa Microsoft Entra, no Storage keys ni SAS. Tiene versionado, retención de 14 días y
+bloqueo nativo. La cuenta personal opera la capa Azure; el usuario organizacional opera Databricks.
+Ambos accesos están declarados mediante RBAC. Los patrones \texttt{*.tfstate}, \texttt{*.tfvars},
+\texttt{*.tfplan} y \texttt{*.tfbackend} permanecen ignorados. El state nunca debe pegarse en tickets
+ni enviarse por correo.
 
 \subsection{Validación efectuada}
 
-Se descargó temporalmente Terraform 1.13.4 con verificación SHA-256 para validar compatibilidad. Se
-ejecutaron \texttt{fmt}, \texttt{init -backend=false} y \texttt{validate} sobre ambas capas. Los
-providers quedaron fijados por lockfiles. El workflow de CI solicita Terraform 1.16.5.
-
-\texttt{-backend=false} significa que la validación no intentó configurar state remoto. No se ejecutó
-\texttt{plan} ni \texttt{apply}; por tanto, no hubo cambios en Azure.
+Se descargó Terraform 1.13.4 con verificación SHA-256. Antes de crear recursos se ejecutaron
+\texttt{fmt}, \texttt{init -backend=false}, \texttt{validate} y \texttt{plan}. Cada \texttt{apply}
+utilizó un plan guardado y una autorización humana explícita. Después de la migración, los planes de
+Azure Dev y Databricks Dev devolvieron \texttt{No changes}, demostrando que mover el state no cambió
+la infraestructura. Los providers quedaron fijados por lockfiles.
 
 \section{Infraestructura Azure definida}
 
@@ -355,15 +366,12 @@ La capa Azure declara:
   \item un workspace Azure Databricks Premium;
   \item un managed resource group con nombre controlado;
   \item etiquetas \texttt{project}, \texttt{environment}, \texttt{owner} y \texttt{managed\_by};
-  \item un presupuesto mensual con alertas al 50, 75, 90 y 100 por ciento.
+  \item integración opcional con budget, desactivada porque el budget inicial ya existe en Azure.
 \end{itemize}
 
-El módulo restringe intencionalmente \texttt{environment} a \texttt{dev}. Esto hace que intentar crear
-QA o Prod en la fase equivocada falle durante la validación.
-
 Azure Budgets alerta, pero no corta el consumo. Además, el importe está expresado en la moneda de
-facturación de la suscripción, no necesariamente en soles. Antes del primer \texttt{apply} se debe
-convertir S/200 con margen conservador y confirmar la región.
+facturación de la suscripción, no necesariamente en soles. Se configuraron USD 58 como objetivo
+operativo aproximado para S/200.
 
 \section{Configuración Databricks definida}
 
@@ -376,7 +384,7 @@ La segunda capa declara:
   \item la carpeta normal \texttt{/Workspace/data/proyecto\_test};
   \item la ruta protegida \texttt{/Workspace/.cicd/proyecto\_test/dev};
   \item \texttt{CAN\_MANAGE} para CI/CD y edición temporal para desarrolladores en Dev;
-  \item catálogo \texttt{proyecto\_dev} y esquema \texttt{cicd};
+  \item catálogo administrado del workspace y esquema \texttt{cicd};
   \item permisos de datos específicos para la identidad del pipeline.
 \end{itemize}
 
@@ -515,6 +523,26 @@ La estrategia para acercarse a S/200 mensuales es:
   \item crear QA y Prod sólo cuando exista una prueba que justifique su costo.
 \end{itemize}
 
+La consulta real de Cost Management del 11 de octubre mostró:
+
+\begin{longtable}{p{0.30\textwidth}p{0.42\textwidth}r}
+\toprule
+\textbf{Servicio} & \textbf{Resource Group} & \textbf{Costo USD} \\
+\midrule
+\endhead
+NAT Gateway & \texttt{rg-databricks-cicd-dev-managed} & 1.76 \\
+Virtual Network & \texttt{rg-databricks-cicd-dev-managed} & 0.20 \\
+Storage & \texttt{rg-databricks-cicd-dev-managed} & 0.00 \\
+\midrule
+\textbf{Total visible} & & \textbf{1.96} \\
+\bottomrule
+\end{longtable}
+
+El hallazgo importante no es el total pequeño, sino su causa. Secure Cluster Connectivity crea un
+NAT Gateway en la red administrada del workspace. Ese recurso genera costo base aunque no haya
+clústeres clásicos activos. Duplicar workspaces permanentes puede duplicar este componente antes de
+ejecutar pruebas. Por eso se eligió QA efímero para el laboratorio.
+
 El orden seguro de destrucción es configuración Databricks primero y capa Azure después. Siempre se
 revisa \texttt{terraform plan -destroy} antes de aplicar la destrucción.
 
@@ -537,31 +565,123 @@ aplica directamente: genera un PR que debe pasar por los mismos checks.
 
 \section{Qué significa ``listo'' en este punto}
 
-\estado{Listo localmente}
+\estado{Dev aceptado de extremo a extremo}
 
 \begin{itemize}
-  \item código y configuración escritos;
-  \item pruebas y linters aprobados;
-  \item dependencias auditadas;
-  \item Terraform inicializado y validado sin backend;
-  \item documentación y ADRs disponibles.
+  \item infraestructura Azure y gobierno Databricks administrados por Terraform;
+  \item validación de PR y despliegue Dev funcionando en GitHub Actions;
+  \item autenticación OIDC sin secretos persistentes;
+  \item carpeta del workspace reconciliada contra el SHA de Git;
+  \item smoke test serverless e idempotencia comprobados;
+  \item states remotos separados, bloqueados y versionados;
+  \item cero runs activos, cero clústeres y warehouse serverless detenido.
 \end{itemize}
 
-\estado{Pendiente de credenciales y autorización humana}
+\estado{Siguiente fase}
 
 \begin{itemize}
-  \item alta Pay-As-You-Go y MFA;
-  \item elección de región y conversión del presupuesto a la moneda de facturación;
-  \item creación del remoto público GitHub;
-  \item primer plan Azure con valores reales;
-  \item revisión conjunta y primer apply;
-  \item configuración de variables del GitHub Environment Dev;
-  \item primera ejecución real del pipeline.
+  \item declarar QA en Terraform sin aplicarlo todavía;
+  \item crear GitHub Environment \texttt{qa} con identidad propia;
+  \item promover tags \texttt{vX.Y.Z-rc.N} al mismo SHA validado en Dev;
+  \item crear QA bajo demanda, ejecutar pruebas y destruirlo al finalizar;
+  \item medir el costo real de una sesión QA antes de diseñar Prod.
 \end{itemize}
+
+\section{Bitácora razonada de la sesión del 11 de octubre}
+
+\subsection{Del state local al backend remoto}
+
+El problema era de continuidad y concurrencia. Un state local depende de un solo equipo y no puede
+bloquear a dos operadores. La solución fue una pila bootstrap que creó un Storage Account
+\texttt{Standard\_LRS}, un contenedor privado, versionado y retención. El bootstrap conserva un state
+local mínimo porque el backend no puede existir antes de ser creado.
+
+La migración se ejecutó una capa a la vez. Terraform confirmó state local existente y destino vacío,
+copió el contenido y después se verificaron \texttt{state list}, tamaño del blob y \texttt{plan}.
+
+\begin{center}
+\begin{tabularx}{\textwidth}{p{0.23\textwidth}p{0.37\textwidth}X}
+\toprule
+\textbf{Capa} & \textbf{Blob} & \textbf{Resultado} \\
+\midrule
+Azure Dev & \texttt{dev/azure.tfstate} & 7,412 bytes; \texttt{No changes} \\
+Databricks Dev & \texttt{dev/databricks.tfstate} & 24,218 bytes; \texttt{No changes} \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\textbf{Causa y consecuencia:} si se hubiera elegido ``no'' al prompt de copia, Terraform habría
+iniciado con state vacío y podría haber propuesto recrear recursos existentes. Por eso se creó primero
+un respaldo local y sólo se respondió ``yes'' después de confirmar que el blob remoto estaba vacío.
+
+\subsection{Por qué participaron dos identidades}
+
+La cuenta personal es propietaria de la suscripción Azure. El usuario organizacional puede administrar
+la cuenta Databricks. El backend se abre antes de que el provider consulte recursos, por lo que ambos
+operadores necesitaban acceso de datos al contenedor. Terraform declaró un
+\texttt{Storage Blob Data Contributor} para cada Object ID, limitado al contenedor.
+
+No se compartieron contraseñas ni se concedió Global Administrator. El principio es separar funciones:
+la identidad apropiada para facturación e infraestructura no tiene por qué ser la misma que gobierna
+Databricks.
+
+\subsection{Qué demostró el despliegue Dev}
+
+El despliegue exitoso no se redujo a copiar archivos. Demostró en conjunto:
+
+\begin{enumerate}
+  \item GitHub emitió un token OIDC para el repositorio y Environment correctos.
+  \item Databricks reconoció al service principal con \texttt{workspace\_access} mínimo.
+  \item El Bundle publicó el SHA exacto en una carpeta normal del workspace.
+  \item La reconciliación comparó rutas, tipos y hashes.
+  \item El smoke test inició cómputo serverless, ejecutó Spark y terminó correctamente.
+  \item Una segunda ejecución restauró drift y no duplicó el Job.
+\end{enumerate}
+
+Después del último merge se comprobó cero runs activos, cero clústeres y el Serverless Starter
+Warehouse en estado \texttt{STOPPED} con cero clústeres.
+
+\subsection{Decisión QA efímero}
+
+La seguridad recomendaría workspaces separados y permanentes; el presupuesto educativo introduce una
+restricción distinta. El costo observado provino principalmente del NAT Gateway administrado, no del
+notebook de humo. Mantener QA todo el mes añadiría costo base aun cuando nadie lo use.
+
+La decisión para el laboratorio es crear QA al publicar un release candidate, desplegar el mismo SHA,
+ejecutar pruebas, conservar evidencia y destruir primero la configuración Databricks y después la capa
+Azure. El state remoto y los tags permanecen. En un entorno bancario real, QA sería permanente por
+disponibilidad, integraciones y gobierno.
+
+\section{Ruta docente propuesta}
+
+El proyecto se estudiará en módulos cortos. Cada módulo combinará teoría, lectura de archivos,
+ejercicio, fallo controlado y preguntas de comprobación:
+
+\begin{longtable}{p{0.10\textwidth}p{0.28\textwidth}p{0.48\textwidth}}
+\toprule
+\textbf{Módulo} & \textbf{Tema} & \textbf{Práctica} \\
+\midrule
+\endhead
+1 & Git y promoción inmutable & Ramas, PR, SHA, tag RC y tag final. \\
+2 & CI y calidad & Ruff, Pytest, SQLFluff, SAST, SCA y secret scanning. \\
+3 & Terraform & Provider, resource, state, plan, apply, drift y destroy. \\
+4 & Azure e identidad & Tenant, suscripción, Entra, RBAC y mínimo privilegio. \\
+5 & Databricks & Workspace, Unity Catalog, Bundles, Jobs y serverless. \\
+6 & OIDC & Claims, subject, audience, federación y ausencia de secretos. \\
+7 & CD e idempotencia & Manifiesto, reconciliación, smoke test y rollback. \\
+8 & Costos & Budget, costo fijo, costo variable, forecast y teardown. \\
+9 & QA efímero & Release candidate, creación, prueba, evidencia y destrucción. \\
+10 & Prod & Aprobaciones, segregación de funciones y recuperación. \\
+\bottomrule
+\end{longtable}
+
+Para cada acción futura se explicarán cuatro preguntas: \textbf{qué hace}, \textbf{por qué se hace},
+\textbf{qué riesgo controla} y \textbf{qué ocurriría si se omite}. Así el repositorio funciona a la vez
+como laboratorio técnico y material de estudio acumulativo.
 
 \section{Glosario breve}
 
-\begin{description}[style=nextline,leftmargin=0pt]
+\begin{description}[style=nextline,leftmargin=2em]
   \item[CI] Integración continua: validación automática de cada cambio.
   \item[CD] Entrega o despliegue continuo: promoción automatizada y controlada.
   \item[Runner] Máquina efímera donde GitHub ejecuta un job.
@@ -580,16 +700,13 @@ aplica directamente: genera un PR que debe pasar por los mismos checks.
 \section{Próximo recorrido recomendado}
 
 \begin{enumerate}
-  \item Leer \texttt{docs/01-azure-account-and-cost.md} y crear la suscripción personalmente.
-  \item Confirmar moneda de facturación, presupuesto equivalente y región disponible.
-  \item Crear el repositorio GitHub público y publicar el commit inicial.
-  \item Instalar Azure CLI y Terraform desde fuentes oficiales.
-  \item Completar \texttt{terraform.tfvars} local sin versionarlo.
-  \item Ejecutar juntos \texttt{terraform plan}; explicar cada alta, cambio o destrucción.
-  \item Sólo después de revisar el plan, autorizar \texttt{terraform apply} para Dev.
-  \item Configurar Databricks y GitHub Environment Dev.
-  \item Abrir un PR de prueba y observar cada job.
-  \item Medir costo real antes de decidir la creación de QA.
+  \item Diseñar las capas Azure y Databricks de QA reutilizando módulos, sin ejecutar \texttt{apply}.
+  \item Añadir identidad OIDC y GitHub Environment exclusivos para QA.
+  \item Implementar promoción mediante tags \texttt{v0.1.0-rc.N} sobre un SHA de \texttt{main}.
+  \item Revisar planes de creación y destrucción antes de cada sesión QA.
+  \item Ejecutar una sesión QA efímera y medir su costo real.
+  \item Destruir QA en orden seguro y confirmar que no quedan recursos huérfanos.
+  \item Convertir cada fase completada en una lección teórica y práctica.
 \end{enumerate}
 
 \vfill
