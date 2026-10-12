@@ -24,7 +24,8 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - Plantillas de backend independientes para los states Azure y Databricks de Dev.
 - Primer despliegue Dev completo por OIDC y smoke test serverless sobre el SHA aprobado.
 - Guía LaTeX actualizada con la ejecución real de Dev, backend remoto, costos y ruta docente.
-- ADR de QA efímero para conservar aislamiento sin exceder el presupuesto del laboratorio.
+- ADR inicial de QA efímero, conservado como historial y reemplazado por el ADR 0010.
+- ADR que reemplaza la decisión anterior y conserva QA durante una ventana controlada de prácticas.
 
 ### Changed
 
@@ -41,8 +42,9 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   bootstrap permanece local.
 - Una reejecución del mismo SHA confirmó que el despliegue restaura modificaciones manuales, elimina
   archivos ajenos al repositorio y no duplica el Job de smoke test.
-- QA se creará bajo demanda para release candidates y se destruirá tras las pruebas; en entornos reales
-  permanece recomendado como ambiente separado y permanente.
+- El despliegue Dev automático ignora merges puramente documentales y conserva ejecución manual.
+- QA se aprovisionará una sola vez y permanecerá durante la fase QA del laboratorio; no se crea por PR
+  y se destruirá al finalizar la fase o si el forecast amenaza el budget.
 
 ### Deprecated
 

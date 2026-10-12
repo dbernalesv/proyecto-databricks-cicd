@@ -121,12 +121,13 @@ después incorporar QA y Prod.
   \item Prueba de drift e idempotencia: un archivo manual fue eliminado, uno modificado fue restaurado
         y el Job no se duplicó al redesplegar el mismo SHA.
   \item States Azure y Databricks migrados a blobs remotos separados, con bloqueo y versionado.
-  \item Costo visible acumulado de USD 1.96, concentrado en NAT Gateway y Virtual Network.
+  \item Primer corte de costo de USD 1.96, luego actualizado a USD 2.42 en Cost Management.
 \end{itemize}
 
-QA y Prod aún no existen. Debido al costo base observado, QA será efímero en este laboratorio: se
-creará para probar un release candidate y se destruirá al terminar. En una plataforma empresarial,
-QA normalmente sería permanente para conservar disponibilidad e integraciones estables.
+QA y Prod aún no existen. QA se aprovisionará una vez y permanecerá durante una ventana controlada
+del laboratorio para practicar release candidates y pruebas repetibles. No se creará por cada PR y se
+destruirá al cerrar la fase QA o si el forecast amenaza el budget. Prod sólo se diseñará después de
+validar QA y medir el costo conjunto.
 
 \subsection{Qué se hace manualmente y qué automatiza Terraform}
 
@@ -427,6 +428,11 @@ permissions:
 \texttt{id-token: write} no da permisos generales de escritura en GitHub. Permite pedir un token OIDC
 temporal que Databricks validará contra la política configurada.
 
+El evento \texttt{push} usa filtros de rutas. Un merge puramente documental sigue pasando CI, pero no
+solicita identidad OIDC, no despliega el Bundle y no inicia el smoke test. Sólo disparan CD los cambios
+en \texttt{proyecto\_test/}, \texttt{resources/}, \texttt{scripts/}, \texttt{databricks.yml} o los
+workflows de despliegue. \texttt{workflow\_dispatch} permanece disponible para una prueba manual.
+
 \subsection{Secuencia exacta del job}
 
 \begin{enumerate}
@@ -541,7 +547,8 @@ Storage & \texttt{rg-databricks-cicd-dev-managed} & 0.00 \\
 El hallazgo importante no es el total pequeño, sino su causa. Secure Cluster Connectivity crea un
 NAT Gateway en la red administrada del workspace. Ese recurso genera costo base aunque no haya
 clústeres clásicos activos. Duplicar workspaces permanentes puede duplicar este componente antes de
-ejecutar pruebas. Por eso se eligió QA efímero para el laboratorio.
+ejecutar pruebas. Un corte posterior mostró USD 2.42 acumulados. QA se conservará durante una ventana
+corta de prácticas, con revisión frecuente de Cost Analysis y una fecha de teardown; no se crea por PR.
 
 El orden seguro de destrucción es configuración Databricks primero y capa Azure después. Siempre se
 revisa \texttt{terraform plan -destroy} antes de aplicar la destrucción.
@@ -583,8 +590,8 @@ aplica directamente: genera un PR que debe pasar por los mismos checks.
   \item declarar QA en Terraform sin aplicarlo todavía;
   \item crear GitHub Environment \texttt{qa} con identidad propia;
   \item promover tags \texttt{vX.Y.Z-rc.N} al mismo SHA validado en Dev;
-  \item crear QA bajo demanda, ejecutar pruebas y destruirlo al finalizar;
-  \item medir el costo real de una sesión QA antes de diseñar Prod.
+  \item crear QA una vez, repetir pruebas durante una ventana controlada y registrar evidencia;
+  \item medir el costo conjunto y destruir QA al cerrar la fase antes de diseñar Prod.
 \end{itemize}
 
 \section{Bitácora razonada de la sesión del 11 de octubre}
@@ -641,16 +648,18 @@ El despliegue exitoso no se redujo a copiar archivos. Demostró en conjunto:
 Después del último merge se comprobó cero runs activos, cero clústeres y el Serverless Starter
 Warehouse en estado \texttt{STOPPED} con cero clústeres.
 
-\subsection{Decisión QA efímero}
+\subsection{Decisión QA persistente durante la fase}
 
-La seguridad recomendaría workspaces separados y permanentes; el presupuesto educativo introduce una
-restricción distinta. El costo observado provino principalmente del NAT Gateway administrado, no del
-notebook de humo. Mantener QA todo el mes añadiría costo base aun cuando nadie lo use.
+La seguridad recomienda workspaces separados y, en plataformas empresariales, normalmente
+permanentes. El presupuesto educativo obliga a limitar el tiempo: el costo observado provino
+principalmente del NAT Gateway administrado, no del notebook de humo. Mantener QA todo el mes puede
+consumir una parte sustancial del budget aun cuando nadie lo use.
 
-La decisión para el laboratorio es crear QA al publicar un release candidate, desplegar el mismo SHA,
-ejecutar pruebas, conservar evidencia y destruir primero la configuración Databricks y después la capa
-Azure. El state remoto y los tags permanecen. En un entorno bancario real, QA sería permanente por
-disponibilidad, integraciones y gobierno.
+La primera decisión fue crear y destruir QA por release candidate. Se reemplazó al observar que eso
+añadía latencia y enseñaba menos sobre operación repetible. QA se creará una sola vez para la fase,
+recibirá varios candidatos y se destruirá al terminar o si el forecast amenaza el budget. Un PR sólo
+ejecuta CI sin credenciales cloud. En un entorno bancario real, QA suele permanecer por disponibilidad,
+integraciones y gobierno.
 
 \section{Ruta docente propuesta}
 
@@ -670,7 +679,7 @@ ejercicio, fallo controlado y preguntas de comprobación:
 6 & OIDC & Claims, subject, audience, federación y ausencia de secretos. \\
 7 & CD e idempotencia & Manifiesto, reconciliación, smoke test y rollback. \\
 8 & Costos & Budget, costo fijo, costo variable, forecast y teardown. \\
-9 & QA efímero & Release candidate, creación, prueba, evidencia y destrucción. \\
+9 & QA controlado & Release candidates, pruebas repetibles, costos y teardown. \\
 10 & Prod & Aprobaciones, segregación de funciones y recuperación. \\
 \bottomrule
 \end{longtable}
@@ -703,9 +712,9 @@ como laboratorio técnico y material de estudio acumulativo.
   \item Diseñar las capas Azure y Databricks de QA reutilizando módulos, sin ejecutar \texttt{apply}.
   \item Añadir identidad OIDC y GitHub Environment exclusivos para QA.
   \item Implementar promoción mediante tags \texttt{v0.1.0-rc.N} sobre un SHA de \texttt{main}.
-  \item Revisar planes de creación y destrucción antes de cada sesión QA.
-  \item Ejecutar una sesión QA efímera y medir su costo real.
-  \item Destruir QA en orden seguro y confirmar que no quedan recursos huérfanos.
+  \item Revisar el plan de creación y autorizar un único aprovisionamiento de QA.
+  \item Ejecutar varias promociones durante una ventana controlada y medir su costo real.
+  \item Destruir QA en orden seguro al cerrar la fase y confirmar que no quedan recursos huérfanos.
   \item Convertir cada fase completada en una lección teórica y práctica.
 \end{enumerate}
 

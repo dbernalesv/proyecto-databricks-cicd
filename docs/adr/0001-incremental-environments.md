@@ -15,7 +15,14 @@ Terraform preparado no genera costo; crear recursos sí.
 ## Actualización 2026-10-11
 
 Dev completó CI/CD, reconciliación, smoke test y migración de state. Cost Management mostró que el NAT
-Gateway administrado es el principal costo base. QA será efímero en el laboratorio: se crea para probar
-un release candidate y se destruye después de recopilar evidencia. En un entorno real con presupuesto
-y requisitos de disponibilidad distintos, QA permanece aprovisionado.
+Gateway administrado es el principal costo base. En ese momento se decidió que QA fuera efímero: se
+crearía para probar un release candidate y se destruiría después de recopilar evidencia. Esta decisión
+fue reemplazada posteriormente por el ADR 0010.
+
+## Actualización 2026-10-11 (decisión posterior)
+
+El ADR 0010 reemplaza la modalidad efímera: QA se creará una vez y permanecerá durante su fase de
+prácticas para permitir promociones y pruebas repetibles. Tendrá revisión frecuente de costos y una
+fecha de teardown. El aprovisionamiento sigue siendo incremental y Prod continúa bloqueado hasta
+validar QA y medir el costo conjunto.
 

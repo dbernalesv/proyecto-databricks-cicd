@@ -126,9 +126,11 @@ USD 0.00 de Storage en `rg-databricks-cicd-dev-managed`. Los datos pueden aparec
 
 El NAT Gateway pertenece a la red administrada que Azure Databricks crea para Secure Cluster
 Connectivity. Su costo continúa mientras el workspace existe, aunque los clústeres estén apagados.
-Por esta razón, Dev permanece estable, QA será efímero durante el laboratorio y Prod no se creará hasta
-medir una promoción completa. En un entorno empresarial, QA suele ser permanente; aquí la diferencia
-responde al presupuesto educativo, no a una recomendación general de arquitectura.
+El costo acumulado observado después aumentó a USD 2.42. Dev permanece estable y QA se conservará
+durante una ventana corta y explícita del laboratorio para repetir pruebas de release candidates. No
+se crea por PR y se destruirá al finalizar la fase QA o si el forecast amenaza el budget. Prod no se
+creará hasta medir el costo conjunto. En un entorno empresarial, la permanencia de QA responde a
+disponibilidad, integraciones y gobierno, no únicamente al presupuesto.
 
 ## Frontera manual y automática
 

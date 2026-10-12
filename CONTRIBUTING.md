@@ -43,6 +43,9 @@ Todo cambio llega a `main` mediante Pull Request:
 8. Tras el merge, el SHA de `main` se sincroniza/despliega en Dev.
 
 El despliegue usa Databricks Bundles y reconstruye `/Workspace/data/proyecto_test` desde ese SHA.
+Los cambios exclusivamente documentales siguen pasando CI, pero no activan CD. El filtro de rutas de
+`deploy-dev.yml` debe mantenerse alineado con `sync.paths`, los recursos del Bundle y los scripts que
+participan en el despliegue. Nunca excluyas una ruta desplegable sólo para ahorrar tiempo de ejecución.
 
 Se recomienda **squash merge** para conservar un historial legible. El título final debe describir el cambio y ser apto para notas de versión.
 
@@ -50,6 +53,10 @@ Se recomienda **squash merge** para conservar un historial legible. El título f
 
 Una versión candidata se identifica con SemVer y un sufijo, por ejemplo `v1.2.0-rc.1`. El tag debe
 apuntar a un commit ya integrado en `main` y validado en Dev. QA prueba ese SHA sin modificar Prod.
+
+Durante el laboratorio, QA se aprovisiona una sola vez y permanece durante una ventana controlada de
+prácticas. No se crea por Pull Request. Se revisan sus costos después de cada sesión y se destruye al
+cerrar la fase QA o si el forecast amenaza el budget.
 
 ```bash
 git switch main
