@@ -23,6 +23,8 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - Pila bootstrap para backend remoto Terraform en Azure Storage, con versionado, retención y RBAC.
 - Plantillas de backend independientes para los states Azure y Databricks de Dev.
 - Primer despliegue Dev completo por OIDC y smoke test serverless sobre el SHA aprobado.
+- Guía LaTeX actualizada con la ejecución real de Dev, backend remoto, costos y ruta docente.
+- ADR de QA efímero para conservar aislamiento sin exceder el presupuesto del laboratorio.
 
 ### Changed
 
@@ -39,6 +41,8 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   bootstrap permanece local.
 - Una reejecución del mismo SHA confirmó que el despliegue restaura modificaciones manuales, elimina
   archivos ajenos al repositorio y no duplica el Job de smoke test.
+- QA se creará bajo demanda para release candidates y se destruirá tras las pruebas; en entornos reales
+  permanece recomendado como ambiente separado y permanente.
 
 ### Deprecated
 

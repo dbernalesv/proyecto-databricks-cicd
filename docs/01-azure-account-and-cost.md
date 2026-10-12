@@ -119,6 +119,17 @@ Analysis sigue siendo la evidencia final y puede mostrar consumo con retraso.
 > Un presupuesto es una alarma, no un freno. Ante un gasto inesperado, detén jobs/cómputo y revisa
 > Cost Analysis antes de continuar.
 
+### Evidencia de costos del 11 de octubre de 2026
+
+Cost Management mostró USD 1.96 acumulados: USD 1.76 de NAT Gateway, USD 0.20 de Virtual Network y
+USD 0.00 de Storage en `rg-databricks-cicd-dev-managed`. Los datos pueden aparecer con retraso.
+
+El NAT Gateway pertenece a la red administrada que Azure Databricks crea para Secure Cluster
+Connectivity. Su costo continúa mientras el workspace existe, aunque los clústeres estén apagados.
+Por esta razón, Dev permanece estable, QA será efímero durante el laboratorio y Prod no se creará hasta
+medir una promoción completa. En un entorno empresarial, QA suele ser permanente; aquí la diferencia
+responde al presupuesto educativo, no a una recomendación general de arquitectura.
+
 ## Frontera manual y automática
 
 La cuenta, MFA, aceptación de términos, método de pago, presupuesto inicial, selección de suscripción
